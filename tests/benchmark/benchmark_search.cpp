@@ -265,6 +265,82 @@ TEST_F(SearchBenchmarkTest, LargeScalePerformance) {
     RecordProperty("LargeScaleQPS", static_cast<int>(qps));
 }
 
+// Benchmark: Search throughput (queries/second) at various scales
+TEST_F(SearchBenchmarkTest, SearchThroughput) {
+    std::cout << "\n=== Search Throughput Benchmark ===" << std::endl;
+
+    // Test different scales: 1K, 5K, 10K vectors
+    std::vector<size_t> scales = {1000, 5000, 10000};
+    const size_t NUM_SEARCH_QUERIES = 500;  // Queries to run per scale
+
+    std::cout << std::setw(12) << "Vectors"
+              << std::setw(15) << "Time (ms)"
+              << std::setw(20) << "Throughput (q/s)" << std::endl;
+    std::cout << std::string(47, '-') << std::endl;
+
+    for (size_t num_vectors : scales) {
+        // Create a fresh store for each test
+        VectorStoreConfig config;
+        config.dimensions = DIMENSIONS;
+        config.max_vectors = num_vectors + 1000;
+        config.thread_pool_size = 4;
+        auto test_store = std::make_unique<VectorStore>(config);
+
+        // Insert vectors
+        std::mt19937 local_rng(SEED);
+        for (size_t i = 0; i < num_vectors; ++i) {
+            auto vec = generateRandomVector(DIMENSIONS, local_rng);
+            test_store->insert(vec, "category_" + std::to_string(i % 10));
+        }
+
+        // Pre-generate query vectors to exclude generation time from measurement
+        std::vector<std::vector<float>> search_queries;
+        search_queries.reserve(NUM_SEARCH_QUERIES);
+        for (size_t i = 0; i < NUM_SEARCH_QUERIES; ++i) {
+            search_queries.push_back(generateRandomVector(DIMENSIONS, local_rng));
+        }
+
+        // Warm-up run (10 queries)
+        for (size_t i = 0; i < 10; ++i) {
+            test_store->search(search_queries[i], TOP_K);
+        }
+
+        // Timed search - use batch search for parallel processing
+        auto start = std::chrono::high_resolution_clock::now();
+
+        auto results = test_store->searchBatch(search_queries, TOP_K);
+
+        auto end = std::chrono::high_resolution_clock::now();
+
+        // Verify results
+        ASSERT_EQ(results.size(), NUM_SEARCH_QUERIES);
+
+        auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+        // Avoid division by zero
+        double throughput = duration_ms > 0 ? (NUM_SEARCH_QUERIES * 1000.0) / duration_ms : 0;
+
+        std::cout << std::setw(12) << num_vectors
+                  << std::setw(12) << duration_ms << " ms"
+                  << std::setw(17) << std::fixed << std::setprecision(0) << throughput << " q/s" << std::endl;
+
+        // Record property for 10K scale
+        if (num_vectors == 10000) {
+            RecordProperty("Search10K_Throughput", static_cast<int>(throughput));
+
+            // Check against target: 10,000 queries/sec
+            std::cout << "\n10K Search Results:" << std::endl;
+            std::cout << "  Throughput: " << throughput << " queries/sec" << std::endl;
+            std::cout << "  Target: 10,000 queries/sec" << std::endl;
+
+            if (throughput >= 10000) {
+                std::cout << "  STATUS: TARGET MET!" << std::endl;
+            } else {
+                std::cout << "  STATUS: " << std::setprecision(1) << (throughput / 10000.0 * 100.0) << "% of target" << std::endl;
+            }
+        }
+    }
+}
+
 // Benchmark: Insert throughput (vectors/second)
 TEST_F(SearchBenchmarkTest, InsertThroughput) {
     std::cout << "\n=== Insert Throughput Benchmark ===" << std::endl;

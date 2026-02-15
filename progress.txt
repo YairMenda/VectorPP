@@ -45,3 +45,47 @@ Started: 02/15/2026 22:37:17
   - All tests pass in ~0.2s total, demonstrating the demo architecture is highly performant
   - The demo workflow (excluding embeddings) can handle 1000 movies with ease
 ---
+
+## Iteration 4 - Insert Throughput Benchmark (US-009)
+- What was implemented: Added InsertThroughput benchmark test to measure vectors/second insertion rate
+- Files changed:
+  - tests/benchmark/benchmark_search.cpp - Added InsertThroughput test
+  - PRD.md - Marked task as complete
+- Implementation details:
+  - Tests at 3 scales: 1K, 5K, 10K vectors
+  - Pre-generates all vectors before timing to exclude generation overhead
+  - Creates fresh VectorStore for each scale to ensure clean measurements
+  - Reports throughput in vectors/sec with formatted table output
+  - Compares against PRD target of 50,000 vectors/sec
+  - Uses RecordProperty for 10K result to enable automated reporting
+- Learnings for future iterations:
+  - Benchmark file is tests/benchmark/benchmark_search.cpp
+  - Run with: cd /c/VectorPP/build && ./Release/benchmark_search.exe
+  - Can filter specific test with --gtest_filter=SearchBenchmarkTest.InsertThroughput
+  - Current performance: ~750-900 vectors/sec at 10K scale (384 dims)
+  - HNSW index building is the bottleneck for insert throughput
+---
+
+## Iteration 5 - Search Throughput Benchmark (US-009)
+- What was implemented: Added SearchThroughput benchmark test to measure queries/second search rate
+- Files changed:
+  - tests/benchmark/benchmark_search.cpp - Added SearchThroughput test
+  - PRD.md - Marked task as complete
+- Implementation details:
+  - Tests at 3 scales: 1K, 5K, 10K vectors
+  - Uses 500 search queries per scale
+  - Pre-generates query vectors to exclude generation overhead
+  - Warm-up run (10 queries) before timing
+  - Uses searchBatch for parallel processing
+  - Reports throughput in queries/sec with formatted table output
+  - Compares against PRD target of 10,000 queries/sec
+  - Uses RecordProperty for 10K result to enable automated reporting
+- Test results:
+  - 1K vectors: ~10,870 q/s
+  - 5K vectors: ~3,067 q/s
+  - 10K vectors: ~2,404 q/s (24% of target)
+- Learnings for future iterations:
+  - Can filter specific test with --gtest_filter=SearchBenchmarkTest.SearchThroughput
+  - Search throughput scales inversely with dataset size (more vectors = slower)
+  - Performance is currently below target - may need HNSW parameter tuning
+---
