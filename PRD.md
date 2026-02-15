@@ -131,7 +131,7 @@ Vector++ is a high-performance, in-memory vector database implemented in C++17. 
 **Description:** As a Python developer, I want a client library that wraps the gRPC interface so that I can easily interact with Vector++.
 
 **Acceptance Criteria:**
-- [ ] Python package with VectorPPClient class
+- [x] Python package with VectorPPClient class
 - [ ] Methods: insert(vector, metadata) -> id, search(vector, k) -> results, delete(id) -> bool
 - [ ] Connection to server via host:port configuration
 - [ ] Clear error handling with Python exceptions

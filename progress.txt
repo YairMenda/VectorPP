@@ -1,114 +1,24 @@
 ﻿# Ralph Progress Log
-Started: 02/15/2026 11:01:18
+Started: 02/15/2026 16:46:00
 ---
 
-## Iteration 1 - US-006: All RPCs are unary (simple request/response)
-- What was implemented: Verified that all gRPC RPCs follow the unary pattern (single request, single response)
-- Files reviewed (no changes needed - already correct):
-  - proto/vectordb.proto: All 3 RPCs use unary pattern (Insert, Search, Delete)
-  - src/server/service_impl.hpp/cpp: Implementation uses standard unary method signatures
-- Tests verified:
-  - 59 vector store tests PASSED
-  - 11 config loader tests PASSED
-  - 16 thread pool tests PASSED
-- Learnings for future iterations:
-  - gRPC is not yet installed in vcpkg (vcpkg lock issue), but core tests still run from previous build
-  - Build outputs exist in build/Release/ directory
-  - Use /c/VectorPP path format in bash (Git Bash on Windows)
----
-
-## Iteration 2 - US-006: Server listens on configurable port (from config file)
+## Iteration 1 - Python package with VectorPPClient class
 - What was implemented:
-  - Added ServerConfig struct to config_loader.hpp with address and port fields
-  - Added load_server_config_from_string() and load_server_config_from_file() functions
-  - Refactored config_loader.cpp with helper functions (parseJson, parseVectorStoreConfig, readFileContents)
-  - Updated grpc_server.hpp to use ServerConfig from config_loader.hpp (removed duplicate struct)
-  - Updated main.cpp to use load_server_config_from_file() which loads full server config including port
-  - Added port and address to config/default.json
-  - Added 11 new tests for ServerConfig loading
-  - Made CMakeLists.txt gRPC-optional so core tests can run without gRPC installed
+  - Created VectorPPClient class with insert(), search(), delete() methods
+  - Created SearchResult dataclass for search results
+  - Created exception hierarchy: VectorPPError, ConnectionError, DimensionMismatchError, VectorNotFoundError, CapacityExceededError
+  - Created __init__.py exporting all public classes
+  - Added context manager support (with statement)
+  - Auto-connect feature when methods are called
+
 - Files changed:
-  - src/config/config_loader.hpp: Added ServerConfig struct and new loader functions
-  - src/config/config_loader.cpp: Refactored with helpers, added ServerConfig parsing
-  - src/server/grpc_server.hpp: Removed duplicate ServerConfig, include config_loader.hpp
-  - src/main.cpp: Use load_server_config_from_file() instead of load_config_from_file()
-  - config/default.json: Added "address" and "port" fields
-  - tests/unit/test_config_loader.cpp: Added 11 ServerConfigLoaderTest tests
-  - CMakeLists.txt: Made gRPC optional for building core components
-- Tests verified:
-  - 22 config loader tests PASSED (11 original + 11 new ServerConfig tests)
-  - 59 vector store tests PASSED
-  - 16 thread pool tests PASSED
-- Learnings for future iterations:
-  - ServerConfig is now the canonical config struct in config_loader.hpp
-  - When --config flag is used, it loads full ServerConfig (port, address, and all VectorStoreConfig fields)
-  - Command line --port and --address can still override config file values
-  - gRPC-dependent targets are now conditional in CMakeLists.txt (GRPC_ENABLED flag)
----
+  - python/vectorpp/__init__.py (created)
+  - python/vectorpp/client.py (created)
+  - python/vectorpp/vectordb_pb2_grpc.py (fixed relative import)
+  - python/tests/test_client.py (created - 13 tests)
 
-## Iteration 3 - US-006: Proper gRPC error codes for all error conditions
-- What was implemented:
-  - Added empty vector validation in Insert RPC (returns INVALID_ARGUMENT)
-  - Added empty query vector validation in Search RPC (returns INVALID_ARGUMENT)
-  - Added logging for top_k validation failure in Search RPC
-  - Added 3 new integration tests: InsertEmptyVectorFails, SearchEmptyQueryVectorFails, SearchWrongDimensionFails
-- Files changed:
-  - src/server/service_impl.cpp: Added empty vector checks with proper error codes
-  - tests/integration/test_grpc_server.cpp: Added 3 new error condition tests
-- Error codes summary:
-  - Insert: INVALID_ARGUMENT (empty/wrong dim), RESOURCE_EXHAUSTED (capacity), INTERNAL (other)
-  - Search: INVALID_ARGUMENT (empty query/wrong dim/invalid top_k), INTERNAL (other)
-  - Delete: INVALID_ARGUMENT (empty id), NOT_FOUND (id missing), INTERNAL (other)
-- Tests verified:
-  - 22 config loader tests PASSED
-  - 16 thread pool tests PASSED
-  - 59 vector store tests PASSED
-  - (gRPC integration tests require gRPC to be installed)
 - Learnings for future iterations:
-  - vcpkg lock issue persists - gRPC cannot be installed yet
-  - Core tests run without gRPC; integration tests only compile when GRPC_ENABLED=TRUE
-  - All validations are done before calling store methods to fail fast
----
-
-## Iteration 4 - US-006: Server logs requests to stdout/stderr
-- What was implemented:
-  - Verified that request logging was already fully implemented in previous work
-  - No new code changes required - functionality was complete
-- Existing logging implementation:
-  - service_impl.cpp has logRequest() method with timestamp format [YYYY-MM-DD HH:MM:SS.mmm]
-  - Insert logs: vector_dim, metadata, and failures
-  - Search logs: vector_dim, top_k, filter, and failures
-  - Delete logs: id and failures
-  - grpc_server.cpp logs server startup with all config parameters
-  - Shutdown logging also implemented
-- Tests verified:
-  - 22 config loader tests PASSED
-  - 16 thread pool tests PASSED
-  - 59 vector store tests PASSED
-- Learnings for future iterations:
-  - Request logging uses std::cout for all output (stdout)
-  - Timestamp includes milliseconds for precise timing
-  - All error paths include "FAILED - " prefix for easy log parsing
----
-
-## Iteration 5 - US-006: Server handles concurrent requests safely
-- What was implemented:
-  - Added thread-safe logging to VectorDBServiceImpl using mutex protection
-  - Added log_mutex_ member to VectorDBServiceImpl class
-  - Updated logRequest() to build log message in ostringstream then output atomically with lock
-  - Added documentation comments in grpc_server.cpp explaining concurrency model
-- Files changed:
-  - src/server/service_impl.hpp: Added <mutex> include, log_mutex_ member, updated class comment
-  - src/server/service_impl.cpp: Updated logRequest() to use ostringstream and mutex
-  - src/server/grpc_server.cpp: Added comments explaining gRPC concurrency model
-- Thread safety summary:
-  - VectorStore: Already thread-safe via internal mutex
-  - VectorDBServiceImpl: Now uses log_mutex_ for thread-safe stdout output
-  - gRPC Server: Uses synchronous model which spawns threads for concurrent requests
-- Tests verified:
-  - 102 tests PASSED (59 vector store, 22 config loader, 16 thread pool, 5 benchmark)
-- Learnings for future iterations:
-  - gRPC synchronous server automatically handles concurrent requests via thread spawning
-  - stdout is not thread-safe for concurrent writes - use mutex + ostringstream pattern
-  - Build log message in ostringstream first, then output atomically to prevent interleaving
+  - The protobuf generated file (vectordb_pb2_grpc.py) had a direct import that needed to be changed to a relative import for package use
+  - Protobuf uses 32-bit floats, so test assertions need almostEqual for float comparisons
+  - The VectorDBStub class from the generated code is what wraps the gRPC channel
 ---
