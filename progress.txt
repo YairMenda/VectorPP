@@ -51,3 +51,19 @@ Started: 02/15/2026 16:46:00
   - Multiple PRD tasks were implemented together in Iteration 1 but only one was marked complete
   - The client.py constructor on line 58 shows: `def __init__(self, host: str = "localhost", port: int = 50051)`
 ---
+
+## Iteration 4 - Clear error handling with Python exceptions
+- What was implemented:
+  - Verified this feature was already implemented in Iteration 1
+  - Exception hierarchy: VectorPPError (base), ConnectionError, DimensionMismatchError, VectorNotFoundError, CapacityExceededError
+  - _handle_grpc_error method translates gRPC status codes to Python exceptions
+  - Tests verify exception hierarchy and error handling behavior
+
+- Files changed:
+  - No changes needed - feature already implemented
+
+- Learnings for future iterations:
+  - Error handling was fully implemented in Iteration 1 along with the client
+  - Tests exist: test_exception_hierarchy, test_delete_not_found, test_insert_dimension_mismatch, test_insert_capacity_exceeded
+  - The _handle_grpc_error method (client.py:102-118) handles INVALID_ARGUMENT, NOT_FOUND, RESOURCE_EXHAUSTED, UNAVAILABLE
+---

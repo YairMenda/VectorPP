@@ -134,7 +134,7 @@ Vector++ is a high-performance, in-memory vector database implemented in C++17. 
 - [x] Python package with VectorPPClient class
 - [x] Methods: insert(vector, metadata) -> id, search(vector, k) -> results, delete(id) -> bool
 - [x] Connection to server via host:port configuration
-- [ ] Clear error handling with Python exceptions
+- [x] Clear error handling with Python exceptions
 - [ ] Helper functions to generate embeddings using OpenAI API
 - [ ] Helper functions to generate embeddings using HuggingFace (sentence-transformers)
 - [ ] README with usage examples
