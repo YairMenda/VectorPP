@@ -74,13 +74,13 @@ std::string VectorStore::insert(const std::vector<float>& vector, const std::str
     return uuid;
 }
 
-std::vector<SearchResult> VectorStore::search(const std::vector<float>& query, size_t k,
+std::vector<VectorSearchResult> VectorStore::search(const std::vector<float>& query, size_t k,
                                                const std::string& filter_metadata) const {
     std::lock_guard<std::mutex> lock(mutex_);
     return searchInternal(query, k, filter_metadata);
 }
 
-std::vector<SearchResult> VectorStore::searchInternal(const std::vector<float>& query, size_t k,
+std::vector<VectorSearchResult> VectorStore::searchInternal(const std::vector<float>& query, size_t k,
                                                        const std::string& filter_metadata) const {
     // Note: Caller must hold mutex_
 
@@ -112,8 +112,8 @@ std::vector<SearchResult> VectorStore::searchInternal(const std::vector<float>& 
     // Search
     auto results = index_->searchKnn(normalized.data(), k);
 
-    // Convert to SearchResult
-    std::vector<SearchResult> output;
+    // Convert to VectorSearchResult
+    std::vector<VectorSearchResult> output;
     output.reserve(results.size());
 
     while (!results.empty()) {
@@ -143,14 +143,14 @@ std::vector<SearchResult> VectorStore::searchInternal(const std::vector<float>& 
 
     // Sort by score descending (results came in ascending order from priority queue)
     std::sort(output.begin(), output.end(),
-              [](const SearchResult& a, const SearchResult& b) {
+              [](const VectorSearchResult& a, const VectorSearchResult& b) {
                   return a.score > b.score;
               });
 
     return output;
 }
 
-std::vector<std::vector<SearchResult>> VectorStore::searchBatch(
+std::vector<std::vector<VectorSearchResult>> VectorStore::searchBatch(
     const std::vector<std::vector<float>>& queries,
     size_t k,
     const std::string& filter_metadata) const {
@@ -160,7 +160,7 @@ std::vector<std::vector<SearchResult>> VectorStore::searchBatch(
     }
 
     // Submit all search tasks to the thread pool
-    std::vector<std::future<std::vector<SearchResult>>> futures;
+    std::vector<std::future<std::vector<VectorSearchResult>>> futures;
     futures.reserve(queries.size());
 
     for (const auto& query : queries) {
@@ -172,7 +172,7 @@ std::vector<std::vector<SearchResult>> VectorStore::searchBatch(
     }
 
     // Collect results in order
-    std::vector<std::vector<SearchResult>> results;
+    std::vector<std::vector<VectorSearchResult>> results;
     results.reserve(queries.size());
 
     for (auto& future : futures) {

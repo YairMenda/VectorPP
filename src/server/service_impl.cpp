@@ -98,11 +98,12 @@ grpc::Status VectorDBServiceImpl::Search(grpc::ServerContext* context,
                                        request->filter_metadata());
 
         // Convert results to proto format
-        for (const auto& result : results) {
+        // (result is a VectorSearchResult from vector_store.hpp)
+        for (const auto& r : results) {
             auto* proto_result = response->add_results();
-            proto_result->set_id(result.id);
-            proto_result->set_score(result.score);
-            proto_result->set_metadata(result.metadata);
+            proto_result->set_id(r.id);
+            proto_result->set_score(r.score);
+            proto_result->set_metadata(r.metadata);
         }
 
         return grpc::Status::OK;

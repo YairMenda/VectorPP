@@ -8,35 +8,53 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Use FetchContent for dependencies
 include(FetchContent)
 
-# Google Test
-FetchContent_Declare(
-    googletest
-    GIT_REPOSITORY https://github.com/google/googletest.git
-    GIT_TAG v1.14.0
-)
-# For Windows: Prevent overriding the parent project's compiler/linker settings
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(googletest)
-
-# nlohmann/json (header-only)
-FetchContent_Declare(
-    nlohmann_json
-    GIT_REPOSITORY https://github.com/nlohmann/json.git
-    GIT_TAG v3.11.3
-)
-FetchContent_MakeAvailable(nlohmann_json)
-
-# hnswlib (header-only)
-FetchContent_Declare(
-    hnswlib
-    GIT_REPOSITORY https://github.com/nmslib/hnswlib.git
-    GIT_TAG v0.8.0
-)
-FetchContent_MakeAvailable(hnswlib)
-
-# gRPC and Protobuf (optional for now)
+# gRPC and Protobuf (optional - try to find first as it brings its own deps)
 find_package(Protobuf CONFIG QUIET)
 find_package(gRPC CONFIG QUIET)
+
+# Google Test - prefer vcpkg version if available (comes with gRPC), otherwise use FetchContent
+find_package(GTest CONFIG QUIET)
+if(NOT GTest_FOUND)
+    message(STATUS "GTest not found via vcpkg, using FetchContent")
+    FetchContent_Declare(
+        googletest
+        GIT_REPOSITORY https://github.com/google/googletest.git
+        GIT_TAG v1.14.0
+    )
+    # For Windows: Prevent overriding the parent project's compiler/linker settings
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(googletest)
+else()
+    message(STATUS "Using GTest from vcpkg")
+endif()
+
+# nlohmann/json - prefer vcpkg version if available, otherwise use FetchContent
+find_package(nlohmann_json CONFIG QUIET)
+if(NOT nlohmann_json_FOUND)
+    message(STATUS "nlohmann_json not found via vcpkg, using FetchContent")
+    FetchContent_Declare(
+        nlohmann_json
+        GIT_REPOSITORY https://github.com/nlohmann/json.git
+        GIT_TAG v3.11.3
+    )
+    FetchContent_MakeAvailable(nlohmann_json)
+else()
+    message(STATUS "Using nlohmann_json from vcpkg")
+endif()
+
+# hnswlib - prefer vcpkg version if available, otherwise use FetchContent
+find_package(hnswlib CONFIG QUIET)
+if(NOT hnswlib_FOUND)
+    message(STATUS "hnswlib not found via vcpkg, using FetchContent")
+    FetchContent_Declare(
+        hnswlib
+        GIT_REPOSITORY https://github.com/nmslib/hnswlib.git
+        GIT_TAG v0.8.0
+    )
+    FetchContent_MakeAvailable(hnswlib)
+else()
+    message(STATUS "Using hnswlib from vcpkg")
+endif()
 
 if(gRPC_FOUND AND Protobuf_FOUND)
     set(GRPC_ENABLED TRUE)
@@ -88,8 +106,14 @@ add_library(vectorpp_core
 
 target_include_directories(vectorpp_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${hnswlib_SOURCE_DIR}
 )
+
+# Link hnswlib (header-only) - vcpkg provides target, FetchContent uses source dir
+if(hnswlib_FOUND)
+    target_link_libraries(vectorpp_core PUBLIC hnswlib::hnswlib)
+else()
+    target_include_directories(vectorpp_core PUBLIC ${hnswlib_SOURCE_DIR})
+endif()
 
 target_link_libraries(vectorpp_core PUBLIC
     nlohmann_json::nlohmann_json
@@ -158,7 +182,6 @@ add_executable(test_vector_store
 
 target_include_directories(test_vector_store PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${hnswlib_SOURCE_DIR}
 )
 
 target_link_libraries(test_vector_store PRIVATE
@@ -176,7 +199,6 @@ add_executable(test_config_loader
 
 target_include_directories(test_config_loader PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${hnswlib_SOURCE_DIR}
 )
 
 target_link_libraries(test_config_loader PRIVATE
@@ -210,7 +232,6 @@ add_executable(benchmark_search
 
 target_include_directories(benchmark_search PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${hnswlib_SOURCE_DIR}
 )
 
 target_link_libraries(benchmark_search PRIVATE

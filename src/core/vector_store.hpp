@@ -55,8 +55,8 @@ struct VectorStoreConfig {
     size_t thread_pool_size = 0;  // 0 = hardware_concurrency
 };
 
-// Search result structure
-struct SearchResult {
+// Search result structure (named VectorSearchResult to avoid conflict with protobuf)
+struct VectorSearchResult {
     std::string id;
     float score;
     std::string metadata;
@@ -76,12 +76,12 @@ public:
 
     // Core operations
     std::string insert(const std::vector<float>& vector, const std::string& metadata = "");
-    std::vector<SearchResult> search(const std::vector<float>& query, size_t k,
+    std::vector<VectorSearchResult> search(const std::vector<float>& query, size_t k,
                                      const std::string& filter_metadata = "") const;
     bool remove(const std::string& id);
 
     // Parallel batch search - processes multiple queries using thread pool
-    std::vector<std::vector<SearchResult>> searchBatch(
+    std::vector<std::vector<VectorSearchResult>> searchBatch(
         const std::vector<std::vector<float>>& queries,
         size_t k,
         const std::string& filter_metadata = "") const;
@@ -94,7 +94,7 @@ public:
 
 private:
     // Internal search helper (no lock - caller must hold mutex_)
-    std::vector<SearchResult> searchInternal(const std::vector<float>& query, size_t k,
+    std::vector<VectorSearchResult> searchInternal(const std::vector<float>& query, size_t k,
                                               const std::string& filter_metadata) const;
 
     VectorStoreConfig config_;
