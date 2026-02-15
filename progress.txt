@@ -1,3 +1,18 @@
 ﻿# Ralph Progress Log
-Started: 02/15/2026 10:00:17
+Started: 02/15/2026 11:01:18
+---
+
+## Iteration 1 - US-006: All RPCs are unary (simple request/response)
+- What was implemented: Verified that all gRPC RPCs follow the unary pattern (single request, single response)
+- Files reviewed (no changes needed - already correct):
+  - proto/vectordb.proto: All 3 RPCs use unary pattern (Insert, Search, Delete)
+  - src/server/service_impl.hpp/cpp: Implementation uses standard unary method signatures
+- Tests verified:
+  - 59 vector store tests PASSED
+  - 11 config loader tests PASSED
+  - 16 thread pool tests PASSED
+- Learnings for future iterations:
+  - gRPC is not yet installed in vcpkg (vcpkg lock issue), but core tests still run from previous build
+  - Build outputs exist in build/Release/ directory
+  - Use /c/VectorPP path format in bash (Git Bash on Windows)
 ---

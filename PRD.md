@@ -114,7 +114,7 @@ Vector++ is a high-performance, in-memory vector database implemented in C++17. 
 
 **Acceptance Criteria:**
 - [x] Proto file defines VectorDB service with Insert, Search, Delete RPCs
-- [ ] All RPCs are unary (simple request/response)
+- [x] All RPCs are unary (simple request/response)
 - [ ] Server listens on configurable port (from config file)
 - [ ] Proper gRPC error codes for all error conditions
 - [ ] Server logs requests to stdout/stderr
