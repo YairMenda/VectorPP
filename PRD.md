@@ -149,7 +149,7 @@ Vector++ is a high-performance, in-memory vector database implemented in C++17. 
 **Description:** As a portfolio reviewer, I want to see a compelling demo that shows Vector++ finding similar movies so that I understand the practical application.
 
 **Acceptance Criteria:**
-- [ ] Script loads movie dataset (IMDB top 1000 or MovieLens)
+- [x] Script loads movie dataset (IMDB top 1000 or MovieLens)
 - [ ] Generates embeddings for movie titles/descriptions using OpenAI or HuggingFace
 - [ ] Inserts all movie embeddings into Vector++
 - [ ] Interactive search: user enters a movie, sees top 5 similar movies
