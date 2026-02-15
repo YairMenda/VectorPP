@@ -166,7 +166,7 @@ Vector++ is a high-performance, in-memory vector database implemented in C++17. 
 **Description:** As a developer, I want benchmarks measuring queries/second so that I can validate performance claims and optimize.
 
 **Acceptance Criteria:**
-- [ ] Benchmark measures insert throughput (vectors/second)
+- [x] Benchmark measures insert throughput (vectors/second)
 - [ ] Benchmark measures search throughput (queries/second)
 - [ ] Tests at various scales: 1K, 5K, 10K vectors
 - [ ] Tests with different thread counts: 1, 2, 4, 8 threads

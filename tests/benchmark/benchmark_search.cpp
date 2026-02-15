@@ -264,3 +264,65 @@ TEST_F(SearchBenchmarkTest, LargeScalePerformance) {
 
     RecordProperty("LargeScaleQPS", static_cast<int>(qps));
 }
+
+// Benchmark: Insert throughput (vectors/second)
+TEST_F(SearchBenchmarkTest, InsertThroughput) {
+    std::cout << "\n=== Insert Throughput Benchmark ===" << std::endl;
+
+    // Test different scales: 1K, 5K, 10K vectors
+    std::vector<size_t> scales = {1000, 5000, 10000};
+
+    std::cout << std::setw(12) << "Vectors"
+              << std::setw(15) << "Time (ms)"
+              << std::setw(20) << "Throughput (v/s)" << std::endl;
+    std::cout << std::string(47, '-') << std::endl;
+
+    for (size_t num_vectors : scales) {
+        // Create a fresh store for each test
+        VectorStoreConfig config;
+        config.dimensions = DIMENSIONS;
+        config.max_vectors = num_vectors + 1000;
+        config.thread_pool_size = 4;
+        auto test_store = std::make_unique<VectorStore>(config);
+
+        // Pre-generate all vectors to exclude generation time from measurement
+        std::vector<std::vector<float>> vectors;
+        vectors.reserve(num_vectors);
+        std::mt19937 local_rng(SEED);
+        for (size_t i = 0; i < num_vectors; ++i) {
+            vectors.push_back(generateRandomVector(DIMENSIONS, local_rng));
+        }
+
+        // Timed insert
+        auto start = std::chrono::high_resolution_clock::now();
+
+        for (size_t i = 0; i < num_vectors; ++i) {
+            test_store->insert(vectors[i], "category_" + std::to_string(i % 10));
+        }
+
+        auto end = std::chrono::high_resolution_clock::now();
+
+        auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+        double throughput = (num_vectors * 1000.0) / duration_ms;
+
+        std::cout << std::setw(12) << num_vectors
+                  << std::setw(12) << duration_ms << " ms"
+                  << std::setw(17) << std::fixed << std::setprecision(0) << throughput << " v/s" << std::endl;
+
+        // Record property for 10K scale
+        if (num_vectors == 10000) {
+            RecordProperty("Insert10K_Throughput", static_cast<int>(throughput));
+
+            // Check against target: 50,000 vectors/sec
+            std::cout << "\n10K Insert Results:" << std::endl;
+            std::cout << "  Throughput: " << throughput << " vectors/sec" << std::endl;
+            std::cout << "  Target: 50,000 vectors/sec" << std::endl;
+
+            if (throughput >= 50000) {
+                std::cout << "  STATUS: TARGET MET!" << std::endl;
+            } else {
+                std::cout << "  STATUS: " << std::setprecision(1) << (throughput / 50000.0 * 100.0) << "% of target" << std::endl;
+            }
+        }
+    }
+}
