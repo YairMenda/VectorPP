@@ -107,3 +107,26 @@ Started: 02/15/2026 22:37:17
   - Performance decreases with scale due to HNSW index complexity
   - The existing benchmark architecture supports easy addition of more scales if needed
 ---
+
+## Iteration 7 - Thread Count Scaling Benchmark (US-009)
+- What was implemented: Added ThreadCountScaling benchmark test to measure performance across 1, 2, 4, 8 threads
+- Files changed:
+  - tests/benchmark/benchmark_search.cpp - Added ThreadCountScaling test
+  - PRD.md - Marked task as complete
+- Implementation details:
+  - Tests search throughput with 500 queries on 5000 vectors (384 dims)
+  - Creates fresh VectorStore for each thread count with config.thread_pool_size set accordingly
+  - Uses searchBatch for parallel processing
+  - Calculates and displays speedup relative to single-threaded baseline
+  - Records QPS for each thread count via RecordProperty
+- Test results (run on 2/15/2026):
+  - 1 thread: ~3425 q/s (baseline)
+  - 2 threads: ~2976 q/s (0.87x)
+  - 4 threads: ~3289 q/s (0.96x)
+  - 8 threads: ~3226 q/s (0.94x)
+- Learnings for future iterations:
+  - Can filter test with --gtest_filter=SearchBenchmarkTest.ThreadCountScaling
+  - HNSW search does not scale linearly with threads due to internal locking
+  - Thread overhead can actually decrease performance on small batch sizes
+  - The searchBatch parallelization is most effective for large query batches
+---

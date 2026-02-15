@@ -341,6 +341,88 @@ TEST_F(SearchBenchmarkTest, SearchThroughput) {
     }
 }
 
+// Benchmark: Thread count scaling (1, 2, 4, 8 threads)
+TEST_F(SearchBenchmarkTest, ThreadCountScaling) {
+    std::cout << "\n=== Thread Count Scaling Benchmark ===" << std::endl;
+
+    const size_t TEST_VECTORS = 5000;       // Fixed dataset size
+    const size_t NUM_SEARCH_QUERIES = 500;  // Queries to run
+    std::vector<size_t> thread_counts = {1, 2, 4, 8};
+
+    std::cout << std::setw(10) << "Threads"
+              << std::setw(15) << "Time (ms)"
+              << std::setw(20) << "Throughput (q/s)"
+              << std::setw(15) << "Speedup" << std::endl;
+    std::cout << std::string(60, '-') << std::endl;
+
+    double baseline_time_ms = 0;
+
+    for (size_t num_threads : thread_counts) {
+        // Create a fresh store with the specified thread count
+        VectorStoreConfig config;
+        config.dimensions = DIMENSIONS;
+        config.max_vectors = TEST_VECTORS + 1000;
+        config.thread_pool_size = num_threads;
+        auto test_store = std::make_unique<VectorStore>(config);
+
+        // Insert vectors (same for all thread counts)
+        std::mt19937 local_rng(SEED);
+        for (size_t i = 0; i < TEST_VECTORS; ++i) {
+            auto vec = generateRandomVector(DIMENSIONS, local_rng);
+            test_store->insert(vec, "category_" + std::to_string(i % 10));
+        }
+
+        // Pre-generate query vectors
+        std::vector<std::vector<float>> search_queries;
+        search_queries.reserve(NUM_SEARCH_QUERIES);
+        for (size_t i = 0; i < NUM_SEARCH_QUERIES; ++i) {
+            search_queries.push_back(generateRandomVector(DIMENSIONS, local_rng));
+        }
+
+        // Warm-up run (10 queries)
+        for (size_t i = 0; i < 10; ++i) {
+            test_store->search(search_queries[i], TOP_K);
+        }
+
+        // Timed search using batch (parallel) search
+        auto start = std::chrono::high_resolution_clock::now();
+        auto results = test_store->searchBatch(search_queries, TOP_K);
+        auto end = std::chrono::high_resolution_clock::now();
+
+        // Verify results
+        ASSERT_EQ(results.size(), NUM_SEARCH_QUERIES);
+
+        auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+        double throughput = duration_ms > 0 ? (NUM_SEARCH_QUERIES * 1000.0) / duration_ms : 0;
+
+        // Calculate speedup from baseline (1 thread)
+        double speedup = 1.0;
+        if (num_threads == 1) {
+            baseline_time_ms = static_cast<double>(duration_ms);
+        } else if (baseline_time_ms > 0 && duration_ms > 0) {
+            speedup = baseline_time_ms / duration_ms;
+        }
+
+        std::cout << std::setw(10) << num_threads
+                  << std::setw(12) << duration_ms << " ms"
+                  << std::setw(17) << std::fixed << std::setprecision(0) << throughput << " q/s"
+                  << std::setw(12) << std::setprecision(2) << speedup << "x" << std::endl;
+
+        // Record properties for each thread count
+        std::string prop_name = "Thread" + std::to_string(num_threads) + "_QPS";
+        RecordProperty(prop_name, static_cast<int>(throughput));
+
+        if (num_threads == 8) {
+            RecordProperty("Thread8_Speedup", static_cast<int>(speedup * 100));
+        }
+    }
+
+    std::cout << "\nNotes:" << std::endl;
+    std::cout << "  - Dataset: " << TEST_VECTORS << " vectors, " << DIMENSIONS << " dimensions" << std::endl;
+    std::cout << "  - Queries: " << NUM_SEARCH_QUERIES << ", top-k: " << TOP_K << std::endl;
+    std::cout << "  - Speedup is relative to single-threaded performance" << std::endl;
+}
+
 // Benchmark: Insert throughput (vectors/second)
 TEST_F(SearchBenchmarkTest, InsertThroughput) {
     std::cout << "\n=== Insert Throughput Benchmark ===" << std::endl;
