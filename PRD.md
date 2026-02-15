@@ -137,7 +137,7 @@ Vector++ is a high-performance, in-memory vector database implemented in C++17. 
 - [x] Clear error handling with Python exceptions
 - [x] Helper functions to generate embeddings using OpenAI API
 - [x] Helper functions to generate embeddings using HuggingFace (sentence-transformers)
-- [ ] README with usage examples
+- [x] README with usage examples
 
 - **Priority:** 2
 - **Status:** false
