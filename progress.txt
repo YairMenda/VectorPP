@@ -14,3 +14,17 @@ Started: 02/15/2026 22:37:17
   - Timing is displayed in milliseconds (Embedding, Search, Total)
   - Tests use unittest.mock.patch to simulate user input
 ---
+
+## Iteration 2 - Displays Similarity Scores and Response Time (US-008)
+- What was implemented: Verified that similarity scores and response time display was already implemented
+- Files changed:
+  - PRD.md - Marked task as complete
+- Implementation details:
+  - search_similar_movies() function at line 266-321 handles the display
+  - Similarity scores: displayed at line 317 as "Similarity: {score:.4f}"
+  - Response time: displayed at line 311 with Embedding, Search, and Total times in milliseconds
+- Learnings for future iterations:
+  - The search_similar_movies function is the core display function
+  - Timing is captured using time.time() and converted to milliseconds
+  - Tests test_search_similar_movies_success and test_interactive_mode_displays_timing verify this functionality
+---
