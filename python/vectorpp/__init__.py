@@ -13,9 +13,19 @@ from .client import (
     CapacityExceededError,
 )
 
+from .embeddings import (
+    OpenAIEmbeddings,
+    get_openai_embedding,
+    get_openai_embeddings_batch,
+    EmbeddingError,
+    OpenAIError,
+    MissingAPIKeyError,
+)
+
 __version__ = "0.1.0"
 
 __all__ = [
+    # Client
     "VectorPPClient",
     "SearchResult",
     "VectorPPError",
@@ -23,4 +33,11 @@ __all__ = [
     "DimensionMismatchError",
     "VectorNotFoundError",
     "CapacityExceededError",
+    # Embeddings - OpenAI
+    "OpenAIEmbeddings",
+    "get_openai_embedding",
+    "get_openai_embeddings_batch",
+    "EmbeddingError",
+    "OpenAIError",
+    "MissingAPIKeyError",
 ]

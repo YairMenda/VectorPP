@@ -67,3 +67,24 @@ Started: 02/15/2026 16:46:00
   - Tests exist: test_exception_hierarchy, test_delete_not_found, test_insert_dimension_mismatch, test_insert_capacity_exceeded
   - The _handle_grpc_error method (client.py:102-118) handles INVALID_ARGUMENT, NOT_FOUND, RESOURCE_EXHAUSTED, UNAVAILABLE
 ---
+
+## Iteration 5 - Helper functions to generate embeddings using OpenAI API
+- What was implemented:
+  - Created OpenAIEmbeddings class with embed() and embed_batch() methods
+  - Created convenience functions: get_openai_embedding(), get_openai_embeddings_batch()
+  - Created exception hierarchy: EmbeddingError (base), OpenAIError, MissingAPIKeyError
+  - Support for multiple models: text-embedding-3-small (default), text-embedding-3-large, text-embedding-ada-002
+  - API key from parameter or OPENAI_API_KEY environment variable
+  - Lazy-loading of OpenAI client (optional dependency)
+  - 19 tests added for embeddings functionality
+
+- Files changed:
+  - python/vectorpp/embeddings.py (created)
+  - python/vectorpp/__init__.py (updated exports)
+  - python/tests/test_embeddings.py (created - 19 tests)
+
+- Learnings for future iterations:
+  - When mocking lazy-loaded imports (like `from openai import OpenAI` inside a method), inject the mock client directly into the instance (`self._client = mock_client`) rather than trying to patch the import
+  - OpenAI returns embedding data with an `index` field that may be out of order - need to sort by index to match input order
+  - The `dimensions` property provides model-specific dimension info (useful for VectorPP client to validate)
+---
