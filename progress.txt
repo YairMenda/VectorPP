@@ -130,3 +130,47 @@ Started: 02/15/2026 22:37:17
   - Thread overhead can actually decrease performance on small batch sizes
   - The searchBatch parallelization is most effective for large query batches
 ---
+
+## Iteration 8 - Benchmark Results Export to JSON/CSV (US-009)
+- What was implemented: Added ExportResults benchmark test to export all benchmark data to JSON and CSV files
+- Files changed:
+  - tests/benchmark/benchmark_search.cpp - Added ExportResults test and getCurrentTimestamp helper
+  - PRD.md - Marked task as complete
+- Implementation details:
+  - Uses nlohmann/json library (already a project dependency)
+  - Exports to benchmark_results.json with structured data (metadata, insert_throughput, search_throughput, thread_scaling)
+  - Exports to benchmark_results.csv with flat format for easy import into spreadsheets/visualization tools
+  - CSV columns: test_type, num_vectors, num_threads, num_queries, top_k, time_ms, throughput, speedup, target, target_met
+  - JSON includes ISO 8601 timestamp and dimension info in metadata section
+  - Files are written to the current working directory (typically build/)
+- Test results (run on 2/15/2026):
+  - Export test passes in ~45 seconds
+  - JSON file: ~92 lines with structured data
+  - CSV file: 11 rows (header + 10 data rows)
+- Learnings for future iterations:
+  - Run with: --gtest_filter=SearchBenchmarkTest.ExportResults
+  - Output files appear in the working directory where the test is run
+  - nlohmann/json uses .dump(2) for pretty-printed output with 2-space indent
+  - Windows uses localtime_s while Linux uses localtime_r for thread-safe time conversion
+---
+
+## Iteration 9 - Vector Dimension Variations Benchmark (US-009)
+- What was implemented: Added DimensionVariations benchmark test to measure performance across 384, 768, 1536 dimensions
+- Files changed:
+  - tests/benchmark/benchmark_search.cpp - Added DimensionVariations test
+  - PRD.md - Marked task as complete
+- Implementation details:
+  - Tests both insert and search throughput for each dimension
+  - Dimensions tested: 384 (MiniLM), 768 (BERT), 1536 (OpenAI ada-002)
+  - Uses 5000 vectors for insert tests, 500 queries for search tests
+  - Records properties for each dimension's throughput (Insert_Dim384_Throughput, etc.)
+  - Includes summary explaining the significance of each dimension size
+- Test results (run on 2/15/2026):
+  - Insert: 384 dims (1711 v/s), 768 dims (718 v/s), 1536 dims (361 v/s)
+  - Search: 384 dims (3448 q/s), 768 dims (1712 q/s), 1536 dims (882 q/s)
+- Learnings for future iterations:
+  - Can filter test with --gtest_filter=SearchBenchmarkTest.DimensionVariations
+  - Performance scales inversely with dimensions (~4x fewer dims = ~4x throughput)
+  - Higher dimensions require more memory and computation per distance calculation
+  - The test takes ~51 seconds due to building 6 separate indexes (3 dims x 2 test types)
+---

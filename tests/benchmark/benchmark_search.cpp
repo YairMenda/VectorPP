@@ -746,3 +746,120 @@ TEST_F(SearchBenchmarkTest, ExportResults) {
     RecordProperty("JsonExported", 1);
     RecordProperty("CsvExported", 1);
 }
+
+// Benchmark: Vector dimension variations (384, 768, 1536)
+TEST_F(SearchBenchmarkTest, DimensionVariations) {
+    std::cout << "\n=== Dimension Variations Benchmark ===" << std::endl;
+
+    // Test different dimensions: 384 (MiniLM), 768 (BERT), 1536 (OpenAI)
+    std::vector<size_t> dimensions = {384, 768, 1536};
+    const size_t TEST_VECTORS = 5000;
+    const size_t NUM_SEARCH_QUERIES = 500;
+
+    std::cout << "\nInsert Throughput by Dimension:" << std::endl;
+    std::cout << std::setw(12) << "Dimensions"
+              << std::setw(15) << "Time (ms)"
+              << std::setw(20) << "Throughput (v/s)" << std::endl;
+    std::cout << std::string(47, '-') << std::endl;
+
+    // Store results for later comparison
+    std::vector<std::pair<size_t, double>> insert_results;
+    std::vector<std::pair<size_t, double>> search_results;
+
+    for (size_t dims : dimensions) {
+        // Create a fresh store with the specified dimensions
+        VectorStoreConfig config;
+        config.dimensions = dims;
+        config.max_vectors = TEST_VECTORS + 1000;
+        config.thread_pool_size = 4;
+        auto test_store = std::make_unique<VectorStore>(config);
+
+        // Pre-generate vectors with this dimension
+        std::vector<std::vector<float>> vectors;
+        vectors.reserve(TEST_VECTORS);
+        std::mt19937 local_rng(SEED);
+        for (size_t i = 0; i < TEST_VECTORS; ++i) {
+            vectors.push_back(generateRandomVector(dims, local_rng));
+        }
+
+        // Timed insert
+        auto insert_start = std::chrono::high_resolution_clock::now();
+        for (size_t i = 0; i < TEST_VECTORS; ++i) {
+            test_store->insert(vectors[i], "category_" + std::to_string(i % 10));
+        }
+        auto insert_end = std::chrono::high_resolution_clock::now();
+
+        auto insert_ms = std::chrono::duration_cast<std::chrono::milliseconds>(insert_end - insert_start).count();
+        double insert_throughput = (TEST_VECTORS * 1000.0) / insert_ms;
+        insert_results.push_back({dims, insert_throughput});
+
+        std::cout << std::setw(12) << dims
+                  << std::setw(12) << insert_ms << " ms"
+                  << std::setw(17) << std::fixed << std::setprecision(0) << insert_throughput << " v/s" << std::endl;
+
+        // Record property for this dimension
+        std::string prop_name = "Insert_Dim" + std::to_string(dims) + "_Throughput";
+        RecordProperty(prop_name, static_cast<int>(insert_throughput));
+    }
+
+    std::cout << "\nSearch Throughput by Dimension:" << std::endl;
+    std::cout << std::setw(12) << "Dimensions"
+              << std::setw(15) << "Time (ms)"
+              << std::setw(20) << "Throughput (q/s)" << std::endl;
+    std::cout << std::string(47, '-') << std::endl;
+
+    for (size_t dims : dimensions) {
+        // Create a fresh store with the specified dimensions
+        VectorStoreConfig config;
+        config.dimensions = dims;
+        config.max_vectors = TEST_VECTORS + 1000;
+        config.thread_pool_size = 4;
+        auto test_store = std::make_unique<VectorStore>(config);
+
+        // Insert vectors
+        std::mt19937 local_rng(SEED);
+        for (size_t i = 0; i < TEST_VECTORS; ++i) {
+            auto vec = generateRandomVector(dims, local_rng);
+            test_store->insert(vec, "category_" + std::to_string(i % 10));
+        }
+
+        // Generate queries with matching dimensions
+        std::vector<std::vector<float>> search_queries;
+        search_queries.reserve(NUM_SEARCH_QUERIES);
+        for (size_t i = 0; i < NUM_SEARCH_QUERIES; ++i) {
+            search_queries.push_back(generateRandomVector(dims, local_rng));
+        }
+
+        // Warm-up run
+        for (size_t i = 0; i < 10; ++i) {
+            test_store->search(search_queries[i], TOP_K);
+        }
+
+        // Timed search
+        auto search_start = std::chrono::high_resolution_clock::now();
+        auto batch_results = test_store->searchBatch(search_queries, TOP_K);
+        auto search_end = std::chrono::high_resolution_clock::now();
+
+        ASSERT_EQ(batch_results.size(), NUM_SEARCH_QUERIES);
+
+        auto search_ms = std::chrono::duration_cast<std::chrono::milliseconds>(search_end - search_start).count();
+        double search_throughput = search_ms > 0 ? (NUM_SEARCH_QUERIES * 1000.0) / search_ms : 0;
+        search_results.push_back({dims, search_throughput});
+
+        std::cout << std::setw(12) << dims
+                  << std::setw(12) << search_ms << " ms"
+                  << std::setw(17) << std::fixed << std::setprecision(0) << search_throughput << " q/s" << std::endl;
+
+        // Record property for this dimension
+        std::string prop_name = "Search_Dim" + std::to_string(dims) + "_Throughput";
+        RecordProperty(prop_name, static_cast<int>(search_throughput));
+    }
+
+    // Summary
+    std::cout << "\nSummary:" << std::endl;
+    std::cout << "  - Higher dimensions require more computation per vector" << std::endl;
+    std::cout << "  - 384 dims: MiniLM (sentence-transformers)" << std::endl;
+    std::cout << "  - 768 dims: BERT base" << std::endl;
+    std::cout << "  - 1536 dims: OpenAI ada-002" << std::endl;
+    std::cout << "  - Dataset: " << TEST_VECTORS << " vectors, " << NUM_SEARCH_QUERIES << " queries" << std::endl;
+}
