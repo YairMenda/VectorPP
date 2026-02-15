@@ -36,3 +36,18 @@ Started: 02/15/2026 16:46:00
   - The PRD.md task was not marked complete even though it was implemented in the previous iteration
   - Always verify test status before marking tasks complete
 ---
+
+## Iteration 3 - Connection to server via host:port configuration
+- What was implemented:
+  - Verified this feature was already implemented in Iteration 1
+  - VectorPPClient accepts host and port parameters in __init__
+  - Defaults to localhost:50051
+  - test_custom_host_port test validates this functionality
+
+- Files changed:
+  - No changes needed - feature already implemented
+
+- Learnings for future iterations:
+  - Multiple PRD tasks were implemented together in Iteration 1 but only one was marked complete
+  - The client.py constructor on line 58 shows: `def __init__(self, host: str = "localhost", port: int = 50051)`
+---
