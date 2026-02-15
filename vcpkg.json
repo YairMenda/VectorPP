@@ -1,0 +1,12 @@
+{
+  "name": "vectorpp",
+  "version": "0.1.0",
+  "description": "High-performance in-memory vector database",
+  "dependencies": [
+    "gtest",
+    "nlohmann-json",
+    "hnswlib",
+    "grpc",
+    "protobuf"
+  ]
+}

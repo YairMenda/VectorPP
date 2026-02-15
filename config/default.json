@@ -1,0 +1,7 @@
+{
+    "dimensions": 384,
+    "max_vectors": 100000,
+    "hnsw_m": 16,
+    "hnsw_ef_construction": 200,
+    "hnsw_ef_search": 50
+}

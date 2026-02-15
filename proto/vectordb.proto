@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package vectorpp;
+
+service VectorDB {
+  rpc Insert(InsertRequest) returns (InsertResponse);
+  rpc Search(SearchRequest) returns (SearchResponse);
+  rpc Delete(DeleteRequest) returns (DeleteResponse);
+}
+
+message InsertRequest {
+  repeated float vector = 1;
+  string metadata = 2;  // Optional category string
+}
+
+message InsertResponse {
+  string id = 1;  // UUID
+}
+
+message SearchRequest {
+  repeated float query_vector = 1;
+  int32 top_k = 2;
+  string filter_metadata = 3;  // Optional category filter
+}
+
+message SearchResult {
+  string id = 1;
+  float score = 2;
+  string metadata = 3;
+}
+
+message SearchResponse {
+  repeated SearchResult results = 1;
+}
+
+message DeleteRequest {
+  string id = 1;
+}
+
+message DeleteResponse {
+  bool success = 1;
+}

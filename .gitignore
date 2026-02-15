@@ -1,0 +1,100 @@
+# ---------------------
+# C++ & Build Artifacts
+# ---------------------
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# ---------------------
+# CMake & Build Systems
+# ---------------------
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Testing/
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+*.cmake
+!Create_*.cmake
+!Test_*.cmake
+
+# Ignore all build directories (covers build, build_grpc, build_release, etc.)
+build*/
+bin/
+lib/
+
+# ---------------------
+# Dependencies
+# ---------------------
+# vcpkg install directory (Heavy!)
+vcpkg_installed/
+
+# ---------------------
+# Protobuf / gRPC Generated Files
+# ---------------------
+# (Optional: If you generate these into your src folders, uncomment to ignore them. 
+# If CMake generates them into build/, this isn't strictly necessary but good safety).
+# *.pb.cc
+# *.pb.h
+# *_pb2.py
+# *_pb2_grpc.py
+
+# ---------------------
+# Python (Client)
+# ---------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+venv/
+.env
+
+# ---------------------
+# IDE & OS Files
+# ---------------------
+.vscode/
+.vs/
+*.user
+*.suo
+*.ipch
+.DS_Store
+Thumbs.db
+
+# ---------------------
+# Project Specific
+# ---------------------
+# Archive folder (assuming this is for old backups/binaries)
+archive/
+
+# Logs if you output them to root
+*.log
