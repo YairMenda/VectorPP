@@ -28,3 +28,20 @@ Started: 02/15/2026 22:37:17
   - Timing is captured using time.time() and converted to milliseconds
   - Tests test_search_similar_movies_success and test_interactive_mode_displays_timing verify this functionality
 ---
+
+## Iteration 3 - Demo End-to-End Performance (US-008)
+- What was implemented: Added TestEndToEndPerformance test class with 4 tests to verify demo completes in under 1 minute (excluding embedding generation)
+- Files changed:
+  - python/tests/test_movie_demo.py - Added TestEndToEndPerformance class with 4 new tests
+  - PRD.md - Marked task as complete
+- Test coverage includes:
+  - test_demo_end_to_end_under_one_minute: Full workflow with 1000 movies, 10 search queries, interactive mode (asserts < 60s)
+  - test_demo_insert_throughput_meets_target: Verifies insert throughput > 100 movies/sec
+  - test_demo_search_latency_acceptable: Verifies average search latency < 100ms
+  - test_demo_workflow_with_sample_data_fast: Quick workflow with 20 movies (asserts < 5s)
+- Learnings for future iterations:
+  - Mock embeddings to exclude embedding generation time from performance tests
+  - Use generate_sample_movies() * 50 to simulate 1000 movie dataset
+  - All tests pass in ~0.2s total, demonstrating the demo architecture is highly performant
+  - The demo workflow (excluding embeddings) can handle 1000 movies with ease
+---

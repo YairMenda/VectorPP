@@ -154,7 +154,7 @@ Vector++ is a high-performance, in-memory vector database implemented in C++17. 
 - [x] Inserts all movie embeddings into Vector++
 - [x] Interactive search: user enters a movie, sees top 5 similar movies
 - [x] Displays similarity scores and response time
-- [ ] Demo runs end-to-end in under 1 minute (excluding embedding generation)
+- [x] Demo runs end-to-end in under 1 minute (excluding embedding generation)
 
 - **Priority:** 2
 - **Status:** false

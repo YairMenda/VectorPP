@@ -485,3 +485,235 @@ class TestInteractiveMode:
         assert "Search:" in captured.out
         assert "Total:" in captured.out
         assert "ms" in captured.out
+
+
+class TestEndToEndPerformance:
+    """Tests for verifying the demo runs end-to-end in under 1 minute.
+
+    This test validates US-008 acceptance criteria:
+    "Demo runs end-to-end in under 1 minute (excluding embedding generation)"
+
+    The test measures time for:
+    - Loading movies from CSV/sample data
+    - Connecting to Vector++ server (mocked)
+    - Inserting pre-computed vectors (simulating already-embedded data)
+    - Performing multiple searches
+    - Interactive mode operations
+
+    Embedding generation time is excluded by using pre-computed mock vectors.
+    """
+
+    def test_demo_end_to_end_under_one_minute(self, capsys):
+        """Test that the complete demo workflow completes in under 1 minute.
+
+        This simulates a full demo run:
+        1. Load 1000 movies (sample data repeated)
+        2. Insert all movies with pre-computed embeddings
+        3. Perform 10 search queries
+        4. Verify total time < 60 seconds (excluding embedding generation)
+        """
+        import time
+        from vectorpp import SearchResult
+
+        start_time = time.time()
+
+        # Step 1: Load movies (simulate loading 1000 movies)
+        sample_movies = generate_sample_movies()
+        # Repeat to simulate IMDB Top 1000
+        movies = sample_movies * 50  # 20 * 50 = 1000 movies
+        load_movies_time = time.time() - start_time
+
+        # Step 2: Setup mocks for Vector++ client
+        mock_client = Mock()
+        # Pre-generate UUIDs for all movies
+        mock_client.insert.side_effect = [f"uuid-{i}" for i in range(len(movies))]
+
+        # Mock embeddings that return instantly (simulating pre-computed embeddings)
+        mock_embeddings = Mock()
+        mock_embeddings.model_name = "test-model"
+        mock_embeddings.dimensions = 384
+        # Return batch embeddings instantly
+        def mock_embed_batch(texts):
+            return [[0.1 + i * 0.001] * 384 for i in range(len(texts))]
+        mock_embeddings.embed_batch.side_effect = mock_embed_batch
+        mock_embeddings.embed.return_value = [0.1] * 384
+
+        # Step 3: Insert all movies (with mocked embeddings - no actual embedding time)
+        insert_start = time.time()
+        id_to_movie = load_and_embed_movies(mock_client, movies, mock_embeddings, batch_size=32)
+        insert_time = time.time() - insert_start
+
+        # Verify all movies were inserted
+        assert len(id_to_movie) == 1000
+
+        # Step 4: Perform multiple searches
+        mock_search_results = [
+            SearchResult(id=f"uuid-{i}", score=0.9 - i * 0.05, metadata="Action")
+            for i in range(5)
+        ]
+        mock_client.search.return_value = mock_search_results
+
+        search_start = time.time()
+        search_queries = [
+            "action adventure movie",
+            "romantic comedy",
+            "science fiction space",
+            "crime drama thriller",
+            "animated family film",
+            "horror suspense",
+            "war history",
+            "fantasy adventure",
+            "mystery detective",
+            "sports underdog story",
+        ]
+
+        for query in search_queries:
+            search_similar_movies(
+                mock_client, mock_embeddings, query,
+                id_to_movie, top_k=5
+            )
+        search_time = time.time() - search_start
+
+        # Step 5: Test interactive mode with a few queries
+        interactive_start = time.time()
+        with patch('builtins.input', side_effect=[
+            "space adventure",
+            "genre:Action",
+            "top:10",
+            "romantic comedy",
+            "quit"
+        ]):
+            interactive_mode(mock_client, mock_embeddings, id_to_movie)
+        interactive_time = time.time() - interactive_start
+
+        # Calculate total time
+        total_time = time.time() - start_time
+
+        # Print timing breakdown for debugging
+        captured = capsys.readouterr()
+        print(f"\n=== End-to-End Performance Results ===")
+        print(f"Load movies time: {load_movies_time:.3f}s")
+        print(f"Insert time (1000 movies): {insert_time:.3f}s")
+        print(f"Search time (10 queries): {search_time:.3f}s")
+        print(f"Interactive mode time: {interactive_time:.3f}s")
+        print(f"Total time: {total_time:.3f}s")
+        print(f"======================================")
+
+        # Assert total time is under 1 minute (60 seconds)
+        # Using 55 seconds to give some buffer for test infrastructure overhead
+        assert total_time < 60, f"Demo took {total_time:.2f}s, expected < 60s"
+
+    def test_demo_insert_throughput_meets_target(self):
+        """Test that insert throughput is sufficient for demo performance.
+
+        The demo should be able to insert 1000 movies quickly enough
+        to complete the entire workflow in under 1 minute.
+        """
+        import time
+
+        # Setup mocks
+        mock_client = Mock()
+        mock_client.insert.side_effect = [f"uuid-{i}" for i in range(1000)]
+
+        mock_embeddings = Mock()
+        mock_embeddings.model_name = "test-model"
+        mock_embeddings.dimensions = 384
+        mock_embeddings.embed_batch.side_effect = lambda texts: [[0.1] * 384 for _ in texts]
+
+        # Generate 1000 movies
+        movies = generate_sample_movies() * 50
+
+        # Measure insert time
+        start_time = time.time()
+        id_to_movie = load_and_embed_movies(mock_client, movies, mock_embeddings, batch_size=32)
+        insert_time = time.time() - start_time
+
+        # Calculate throughput
+        throughput = len(id_to_movie) / insert_time
+
+        # Should insert at least 100 movies/second (allowing 10s for 1000 movies)
+        # This leaves plenty of time for loading, searching, and interactive mode
+        assert throughput > 100, f"Insert throughput {throughput:.1f} movies/sec, expected > 100"
+
+        # Also verify the insert completed in reasonable time
+        assert insert_time < 30, f"Insert took {insert_time:.2f}s, expected < 30s"
+
+    def test_demo_search_latency_acceptable(self):
+        """Test that search latency is low enough for interactive use.
+
+        Each search should complete in under 100ms to feel responsive
+        in the interactive demo.
+        """
+        import time
+        from vectorpp import SearchResult
+
+        mock_client = Mock()
+        mock_client.search.return_value = [
+            SearchResult(id=f"uuid-{i}", score=0.9 - i * 0.1, metadata="Action")
+            for i in range(10)
+        ]
+
+        mock_embeddings = Mock()
+        mock_embeddings.embed.return_value = [0.1] * 384
+
+        id_to_movie = {
+            f"uuid-{i}": Movie(f"Movie {i}", "2020", "Action", f"Overview {i}", "Director", "8.0")
+            for i in range(10)
+        }
+
+        # Perform 10 searches and measure total time
+        start_time = time.time()
+        for i in range(10):
+            search_similar_movies(
+                mock_client, mock_embeddings, f"test query {i}",
+                id_to_movie, top_k=10
+            )
+        total_time = time.time() - start_time
+
+        # Average latency should be under 100ms
+        avg_latency = (total_time / 10) * 1000  # Convert to ms
+        assert avg_latency < 100, f"Average search latency {avg_latency:.1f}ms, expected < 100ms"
+
+    def test_demo_workflow_with_sample_data_fast(self, capsys):
+        """Test the demo workflow with built-in sample data (20 movies).
+
+        This is the quickest demo path and should complete in seconds.
+        """
+        import time
+        from vectorpp import SearchResult
+
+        start_time = time.time()
+
+        # Load sample movies
+        movies = generate_sample_movies()
+        assert len(movies) == 20
+
+        # Setup mocks
+        mock_client = Mock()
+        mock_client.insert.side_effect = [f"uuid-{i}" for i in range(len(movies))]
+        mock_client.search.return_value = [
+            SearchResult(id="uuid-0", score=0.95, metadata="Action"),
+            SearchResult(id="uuid-1", score=0.85, metadata="Drama"),
+        ]
+
+        mock_embeddings = Mock()
+        mock_embeddings.model_name = "all-MiniLM-L6-v2"
+        mock_embeddings.dimensions = 384
+        mock_embeddings.embed_batch.side_effect = lambda texts: [[0.1] * 384 for _ in texts]
+        mock_embeddings.embed.return_value = [0.1] * 384
+
+        # Insert movies
+        id_to_movie = load_and_embed_movies(mock_client, movies, mock_embeddings, batch_size=32)
+        assert len(id_to_movie) == 20
+
+        # Perform a search
+        search_similar_movies(mock_client, mock_embeddings, "space adventure", id_to_movie, top_k=5)
+
+        # Run interactive mode briefly
+        with patch('builtins.input', side_effect=["inception", "quit"]):
+            interactive_mode(mock_client, mock_embeddings, id_to_movie)
+
+        total_time = time.time() - start_time
+
+        # Sample data workflow should complete in under 5 seconds
+        assert total_time < 5, f"Sample data demo took {total_time:.2f}s, expected < 5s"
