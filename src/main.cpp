@@ -42,7 +42,7 @@ int main(int argc, char* argv[]) {
             return 0;
         } else if (arg == "--config" && i + 1 < argc) {
             try {
-                config.store_config = vectorpp::load_config_from_file(argv[++i]);
+                config = vectorpp::load_server_config_from_file(argv[++i]);
             } catch (const std::exception& e) {
                 std::cerr << "Error loading config: " << e.what() << std::endl;
                 return 1;

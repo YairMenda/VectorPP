@@ -2,20 +2,13 @@
 
 #include <grpcpp/grpcpp.h>
 #include "server/service_impl.hpp"
-#include "core/vector_store.hpp"
+#include "config/config_loader.hpp"
 #include <memory>
 #include <string>
 #include <thread>
 #include <atomic>
 
 namespace vectorpp {
-
-// Configuration for the gRPC server
-struct ServerConfig {
-    std::string address = "0.0.0.0";
-    uint16_t port = 50051;
-    VectorStoreConfig store_config;
-};
 
 // gRPC server wrapper that manages the VectorDB service
 class GrpcServer {

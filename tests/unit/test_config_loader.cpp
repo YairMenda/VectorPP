@@ -165,3 +165,155 @@ TEST(ConfigLoaderTest, LoadDefaultConfigFile) {
     }
     // If not loaded, that's okay - default.json might not be in a predictable path
 }
+
+// ==================== ServerConfig Tests ====================
+
+// Test loading ServerConfig from string with all fields
+TEST(ServerConfigLoaderTest, LoadFromStringAllFields) {
+    std::string json = R"({
+        "address": "127.0.0.1",
+        "port": 8080,
+        "dimensions": 1536,
+        "max_vectors": 50000,
+        "hnsw_m": 32,
+        "hnsw_ef_construction": 100,
+        "hnsw_ef_search": 25
+    })";
+
+    ServerConfig config = load_server_config_from_string(json);
+
+    EXPECT_EQ(config.address, "127.0.0.1");
+    EXPECT_EQ(config.port, 8080);
+    EXPECT_EQ(config.store_config.dimensions, 1536);
+    EXPECT_EQ(config.store_config.max_vectors, 50000);
+    EXPECT_EQ(config.store_config.hnsw_m, 32);
+    EXPECT_EQ(config.store_config.hnsw_ef_construction, 100);
+    EXPECT_EQ(config.store_config.hnsw_ef_search, 25);
+}
+
+// Test loading ServerConfig with only server fields (store defaults)
+TEST(ServerConfigLoaderTest, LoadFromStringServerFieldsOnly) {
+    std::string json = R"({
+        "address": "localhost",
+        "port": 9090
+    })";
+
+    ServerConfig config = load_server_config_from_string(json);
+
+    EXPECT_EQ(config.address, "localhost");
+    EXPECT_EQ(config.port, 9090);
+    // Defaults for store config
+    EXPECT_EQ(config.store_config.dimensions, 384);
+    EXPECT_EQ(config.store_config.max_vectors, 100000);
+}
+
+// Test loading ServerConfig with only store fields (server defaults)
+TEST(ServerConfigLoaderTest, LoadFromStringStoreFieldsOnly) {
+    std::string json = R"({
+        "dimensions": 768,
+        "max_vectors": 5000
+    })";
+
+    ServerConfig config = load_server_config_from_string(json);
+
+    // Defaults for server fields
+    EXPECT_EQ(config.address, "0.0.0.0");
+    EXPECT_EQ(config.port, 50051);
+    // Specified store fields
+    EXPECT_EQ(config.store_config.dimensions, 768);
+    EXPECT_EQ(config.store_config.max_vectors, 5000);
+}
+
+// Test loading ServerConfig from empty string returns defaults
+TEST(ServerConfigLoaderTest, LoadFromEmptyString) {
+    ServerConfig config = load_server_config_from_string("");
+
+    EXPECT_EQ(config.address, "0.0.0.0");
+    EXPECT_EQ(config.port, 50051);
+    EXPECT_EQ(config.store_config.dimensions, 384);
+    EXPECT_EQ(config.store_config.max_vectors, 100000);
+}
+
+// Test loading ServerConfig from empty object returns defaults
+TEST(ServerConfigLoaderTest, LoadFromEmptyObject) {
+    ServerConfig config = load_server_config_from_string("{}");
+
+    EXPECT_EQ(config.address, "0.0.0.0");
+    EXPECT_EQ(config.port, 50051);
+    EXPECT_EQ(config.store_config.dimensions, 384);
+}
+
+// Test loading ServerConfig from file
+TEST(ServerConfigLoaderTest, LoadFromFile) {
+    std::string json = R"({
+        "address": "192.168.1.100",
+        "port": 12345,
+        "dimensions": 512
+    })";
+    TempConfigFile temp(json);
+
+    ServerConfig config = load_server_config_from_file(temp.path());
+
+    EXPECT_EQ(config.address, "192.168.1.100");
+    EXPECT_EQ(config.port, 12345);
+    EXPECT_EQ(config.store_config.dimensions, 512);
+}
+
+// Test loading ServerConfig from non-existent file returns defaults
+TEST(ServerConfigLoaderTest, LoadFromNonExistentFile) {
+    ServerConfig config = load_server_config_from_file("non_existent_server_config_12345.json");
+
+    EXPECT_EQ(config.address, "0.0.0.0");
+    EXPECT_EQ(config.port, 50051);
+    EXPECT_EQ(config.store_config.dimensions, 384);
+}
+
+// Test invalid port value (too high) throws
+TEST(ServerConfigLoaderTest, InvalidPortTooHighThrows) {
+    EXPECT_THROW(load_server_config_from_string(R"({"port": 70000})"), ConfigLoadError);
+}
+
+// Test invalid port type throws
+TEST(ServerConfigLoaderTest, InvalidPortTypeThrows) {
+    EXPECT_THROW(load_server_config_from_string(R"({"port": "8080"})"), ConfigLoadError);
+    EXPECT_THROW(load_server_config_from_string(R"({"port": -1})"), ConfigLoadError);
+}
+
+// Test invalid address type throws
+TEST(ServerConfigLoaderTest, InvalidAddressTypeThrows) {
+    EXPECT_THROW(load_server_config_from_string(R"({"address": 12345})"), ConfigLoadError);
+    EXPECT_THROW(load_server_config_from_string(R"({"address": true})"), ConfigLoadError);
+}
+
+// Test loading actual default.json with server config
+TEST(ServerConfigLoaderTest, LoadDefaultConfigFile) {
+    std::vector<std::string> paths = {
+        "../config/default.json",
+        "config/default.json",
+        "../../config/default.json"
+    };
+
+    ServerConfig config;
+    bool loaded = false;
+
+    for (const auto& path : paths) {
+        std::ifstream file(path);
+        if (file.is_open()) {
+            file.close();
+            config = load_server_config_from_file(path);
+            loaded = true;
+            break;
+        }
+    }
+
+    if (loaded) {
+        // Verify it matches our default.json values
+        EXPECT_EQ(config.address, "0.0.0.0");
+        EXPECT_EQ(config.port, 50051);
+        EXPECT_EQ(config.store_config.dimensions, 384);
+        EXPECT_EQ(config.store_config.max_vectors, 100000);
+        EXPECT_EQ(config.store_config.hnsw_m, 16);
+        EXPECT_EQ(config.store_config.hnsw_ef_construction, 200);
+        EXPECT_EQ(config.store_config.hnsw_ef_search, 50);
+    }
+}

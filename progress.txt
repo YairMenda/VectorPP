@@ -16,3 +16,32 @@ Started: 02/15/2026 11:01:18
   - Build outputs exist in build/Release/ directory
   - Use /c/VectorPP path format in bash (Git Bash on Windows)
 ---
+
+## Iteration 2 - US-006: Server listens on configurable port (from config file)
+- What was implemented:
+  - Added ServerConfig struct to config_loader.hpp with address and port fields
+  - Added load_server_config_from_string() and load_server_config_from_file() functions
+  - Refactored config_loader.cpp with helper functions (parseJson, parseVectorStoreConfig, readFileContents)
+  - Updated grpc_server.hpp to use ServerConfig from config_loader.hpp (removed duplicate struct)
+  - Updated main.cpp to use load_server_config_from_file() which loads full server config including port
+  - Added port and address to config/default.json
+  - Added 11 new tests for ServerConfig loading
+  - Made CMakeLists.txt gRPC-optional so core tests can run without gRPC installed
+- Files changed:
+  - src/config/config_loader.hpp: Added ServerConfig struct and new loader functions
+  - src/config/config_loader.cpp: Refactored with helpers, added ServerConfig parsing
+  - src/server/grpc_server.hpp: Removed duplicate ServerConfig, include config_loader.hpp
+  - src/main.cpp: Use load_server_config_from_file() instead of load_config_from_file()
+  - config/default.json: Added "address" and "port" fields
+  - tests/unit/test_config_loader.cpp: Added 11 ServerConfigLoaderTest tests
+  - CMakeLists.txt: Made gRPC optional for building core components
+- Tests verified:
+  - 22 config loader tests PASSED (11 original + 11 new ServerConfig tests)
+  - 59 vector store tests PASSED
+  - 16 thread pool tests PASSED
+- Learnings for future iterations:
+  - ServerConfig is now the canonical config struct in config_loader.hpp
+  - When --config flag is used, it loads full ServerConfig (port, address, and all VectorStoreConfig fields)
+  - Command line --port and --address can still override config file values
+  - gRPC-dependent targets are now conditional in CMakeLists.txt (GRPC_ENABLED flag)
+---

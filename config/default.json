@@ -1,4 +1,6 @@
 {
+    "address": "0.0.0.0",
+    "port": 50051,
     "dimensions": 384,
     "max_vectors": 100000,
     "hnsw_m": 16,

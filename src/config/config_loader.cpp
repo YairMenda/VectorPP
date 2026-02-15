@@ -5,13 +5,10 @@
 
 namespace vectorpp {
 
-VectorStoreConfig load_config_from_string(const std::string& json_string) {
-    VectorStoreConfig config;
+namespace {
 
-    if (json_string.empty()) {
-        return config;  // Return defaults for empty string
-    }
-
+// Helper to parse JSON from string
+nlohmann::json parseJson(const std::string& json_string) {
     nlohmann::json j;
     try {
         j = nlohmann::json::parse(json_string);
@@ -23,6 +20,11 @@ VectorStoreConfig load_config_from_string(const std::string& json_string) {
         throw ConfigLoadError("JSON root must be an object");
     }
 
+    return j;
+}
+
+// Helper to parse VectorStoreConfig fields from JSON object
+void parseVectorStoreConfig(const nlohmann::json& j, VectorStoreConfig& config) {
     // Parse dimensions
     if (j.contains("dimensions")) {
         if (!j["dimensions"].is_number_unsigned()) {
@@ -69,26 +71,95 @@ VectorStoreConfig load_config_from_string(const std::string& json_string) {
         config.hnsw_ef_search = j["hnsw_ef_search"].get<size_t>();
     }
 
-    return config;
+    // Parse thread_pool_size
+    if (j.contains("thread_pool_size")) {
+        if (!j["thread_pool_size"].is_number_unsigned()) {
+            throw ConfigLoadError("'thread_pool_size' must be a non-negative integer");
+        }
+        config.thread_pool_size = j["thread_pool_size"].get<size_t>();
+    }
 }
 
-VectorStoreConfig load_config_from_file(const std::string& file_path) {
+// Helper to read file contents
+std::string readFileContents(const std::string& file_path) {
     std::ifstream file(file_path);
 
     if (!file.is_open()) {
-        // File doesn't exist - return default config
-        return VectorStoreConfig{};
+        return "";  // File doesn't exist
     }
 
     std::stringstream buffer;
     buffer << file.rdbuf();
-    std::string content = buffer.str();
+    return buffer.str();
+}
+
+} // anonymous namespace
+
+VectorStoreConfig load_config_from_string(const std::string& json_string) {
+    VectorStoreConfig config;
+
+    if (json_string.empty()) {
+        return config;  // Return defaults for empty string
+    }
+
+    nlohmann::json j = parseJson(json_string);
+    parseVectorStoreConfig(j, config);
+
+    return config;
+}
+
+VectorStoreConfig load_config_from_file(const std::string& file_path) {
+    std::string content = readFileContents(file_path);
 
     if (content.empty()) {
-        return VectorStoreConfig{};  // Empty file - return defaults
+        return VectorStoreConfig{};  // Empty or non-existent file - return defaults
     }
 
     return load_config_from_string(content);
+}
+
+ServerConfig load_server_config_from_string(const std::string& json_string) {
+    ServerConfig config;
+
+    if (json_string.empty()) {
+        return config;  // Return defaults for empty string
+    }
+
+    nlohmann::json j = parseJson(json_string);
+
+    // Parse server network settings
+    if (j.contains("address")) {
+        if (!j["address"].is_string()) {
+            throw ConfigLoadError("'address' must be a string");
+        }
+        config.address = j["address"].get<std::string>();
+    }
+
+    if (j.contains("port")) {
+        if (!j["port"].is_number_unsigned()) {
+            throw ConfigLoadError("'port' must be a positive integer");
+        }
+        auto port_val = j["port"].get<uint64_t>();
+        if (port_val > 65535) {
+            throw ConfigLoadError("'port' must be between 0 and 65535");
+        }
+        config.port = static_cast<uint16_t>(port_val);
+    }
+
+    // Parse vector store config (all fields are at root level)
+    parseVectorStoreConfig(j, config.store_config);
+
+    return config;
+}
+
+ServerConfig load_server_config_from_file(const std::string& file_path) {
+    std::string content = readFileContents(file_path);
+
+    if (content.empty()) {
+        return ServerConfig{};  // Empty or non-existent file - return defaults
+    }
+
+    return load_server_config_from_string(content);
 }
 
 } // namespace vectorpp
