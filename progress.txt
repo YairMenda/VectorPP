@@ -22,3 +22,17 @@ Started: 02/15/2026 16:46:00
   - Protobuf uses 32-bit floats, so test assertions need almostEqual for float comparisons
   - The VectorDBStub class from the generated code is what wraps the gRPC channel
 ---
+
+## Iteration 2 - Methods: insert, search, delete
+- What was implemented:
+  - Verified that insert(), search(), and delete() methods were already implemented in Iteration 1
+  - Methods have correct signatures: insert(vector, metadata) -> id, search(vector, k) -> results, delete(id) -> bool
+  - All 13 tests pass
+
+- Files changed:
+  - No changes needed - methods already implemented
+
+- Learnings for future iterations:
+  - The PRD.md task was not marked complete even though it was implemented in the previous iteration
+  - Always verify test status before marking tasks complete
+---
