@@ -88,3 +88,111 @@ Started: 02/15/2026 16:46:00
   - OpenAI returns embedding data with an `index` field that may be out of order - need to sort by index to match input order
   - The `dimensions` property provides model-specific dimension info (useful for VectorPP client to validate)
 ---
+
+## Iteration 6 - Helper functions to generate embeddings using HuggingFace (sentence-transformers)
+- What was implemented:
+  - Created HuggingFaceEmbeddings class with embed() and embed_batch() methods
+  - Created convenience functions: get_huggingface_embedding(), get_huggingface_embeddings_batch()
+  - Added HuggingFaceError exception class
+  - Support for multiple models: all-MiniLM-L6-v2 (default), all-mpnet-base-v2, paraphrase models, multi-qa models
+  - Model dimensions mapping (384 for MiniLM, 768 for mpnet)
+  - Device parameter for CPU/CUDA selection (or auto-detect with None)
+  - Lazy-loading of sentence-transformers (optional dependency)
+  - 22 new tests for HuggingFace embeddings functionality
+
+- Files changed:
+  - python/vectorpp/embeddings.py (added HuggingFaceEmbeddings class and helpers)
+  - python/vectorpp/__init__.py (updated exports for HuggingFace)
+  - python/tests/test_embeddings.py (added 22 tests, now 41 total)
+  - PRD.md (marked task complete)
+
+- Learnings for future iterations:
+  - sentence-transformers uses model.encode() which returns a numpy array directly - use .tolist() to convert to Python list
+  - HuggingFace models are local and don't require API keys, but can take time to download on first use
+  - The device parameter accepts "cpu", "cuda", or None (auto-detect based on available hardware)
+  - Unlike OpenAI, sentence-transformers preserves order so no need to sort by index
+  - numpy import needed in tests for creating mock embeddings (np.array)
+---
+
+## Iteration 7 - README with usage examples
+- What was implemented:
+  - Created comprehensive README.md for the Python client SDK
+  - Includes: installation instructions, quick start guide, API reference
+  - Documents VectorPPClient methods: insert(), search(), delete(), connect(), close()
+  - Documents SearchResult dataclass
+  - Full documentation of OpenAI and HuggingFace embedding helpers
+  - Model dimension tables for both embedding providers
+  - Complete document search example
+  - Error handling guide with exception hierarchy
+  - Server configuration section
+
+- Files changed:
+  - python/README.md (created - comprehensive documentation)
+  - PRD.md (marked task complete)
+
+- Learnings for future iterations:
+  - The Python client SDK supports context manager for automatic connection management
+  - All 54 tests continue to pass (13 client + 41 embeddings)
+  - The embeddings classes have a `dimensions` property useful for VectorPP validation
+  - Windows paths need special handling in bash commands (use C:/ format)
+---
+
+## Iteration 8 - Script loads movie dataset (IMDB top 1000 or MovieLens)
+- What was implemented:
+  - Created movie_demo.py in python/examples/ directory
+  - Movie dataclass with title, year, genre, overview, director, rating fields
+  - load_movies_from_csv() with flexible column mapping for IMDB/MovieLens formats
+  - generate_sample_movies() with 20 built-in movies for testing without CSV
+  - load_and_embed_movies() for batch embedding and insertion into Vector++
+  - search_similar_movies() with timing display for embedding and search
+  - Interactive mode with genre filtering and configurable top-k results
+  - Command-line interface with argparse for all options
+
+- Files changed:
+  - python/examples/movie_demo.py (created - comprehensive demo script)
+  - python/tests/test_movie_demo.py (created - 15 tests)
+  - PRD.md (marked task complete)
+
+- Learnings for future iterations:
+  - CSV column names can vary (Series_Title vs Title vs Movie_Title) - use flexible mapping
+  - Division by zero protection needed when measuring rates with very fast operations
+  - The demo uses movie.to_text() to combine title, overview, and genre for richer embeddings
+  - Tests for load_and_embed_movies need to mock both client and embeddings
+  - The movie demo supports both --dataset and --generate-sample modes
+---
+
+## Iteration 9 - Generates embeddings for movie titles/descriptions using OpenAI or HuggingFace
+- What was implemented:
+  - Verified this feature was already implemented in Iteration 8
+  - HuggingFaceEmbeddings is imported and used in movie_demo.py
+  - load_and_embed_movies() function calls embeddings.embed_batch(texts) for batch embedding
+  - search_similar_movies() function calls embeddings.embed(query) for query embedding
+  - Model is initialized in main() with configurable --model parameter
+
+- Files changed:
+  - PRD.md (marked task complete)
+
+- Learnings for future iterations:
+  - The embedding generation was implemented as part of the movie demo script structure
+  - load_and_embed_movies handles both embedding generation and insertion to Vector++
+  - HuggingFace embeddings are used by default (all-MiniLM-L6-v2 with 384 dimensions)
+  - The script warmups the model by embedding "test" before processing movies
+---
+
+## Iteration 10 - Inserts all movie embeddings into Vector++
+- What was implemented:
+  - Verified this feature was already implemented in Iteration 8
+  - load_and_embed_movies() function in movie_demo.py handles the insertion
+  - For each movie, it calls client.insert(vector, metadata=movie.genre)
+  - Returns id_to_movie dictionary mapping vector IDs to Movie objects
+  - Includes batch processing for efficient embedding generation
+
+- Files changed:
+  - PRD.md (marked task complete)
+
+- Learnings for future iterations:
+  - The insertion code was bundled with the embedding generation in load_and_embed_movies()
+  - Uses movie genre as metadata for filter support in searches
+  - Test coverage exists in TestLoadAndEmbedMovies class (2 tests)
+  - Error handling ensures failed inserts don't crash the whole batch
+---
