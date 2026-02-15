@@ -17,8 +17,12 @@ from .embeddings import (
     OpenAIEmbeddings,
     get_openai_embedding,
     get_openai_embeddings_batch,
+    HuggingFaceEmbeddings,
+    get_huggingface_embedding,
+    get_huggingface_embeddings_batch,
     EmbeddingError,
     OpenAIError,
+    HuggingFaceError,
     MissingAPIKeyError,
 )
 
@@ -37,7 +41,13 @@ __all__ = [
     "OpenAIEmbeddings",
     "get_openai_embedding",
     "get_openai_embeddings_batch",
+    # Embeddings - HuggingFace
+    "HuggingFaceEmbeddings",
+    "get_huggingface_embedding",
+    "get_huggingface_embeddings_batch",
+    # Embedding Exceptions
     "EmbeddingError",
     "OpenAIError",
+    "HuggingFaceError",
     "MissingAPIKeyError",
 ]
