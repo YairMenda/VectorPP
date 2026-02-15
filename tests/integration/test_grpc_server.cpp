@@ -97,6 +97,21 @@ TEST_F(GrpcServerTest, InsertWrongDimensionFails) {
     ASSERT_EQ(status.error_code(), grpc::StatusCode::INVALID_ARGUMENT);
 }
 
+// Test: Insert with empty vector fails
+TEST_F(GrpcServerTest, InsertEmptyVectorFails) {
+    vectorpp::InsertRequest request;
+    // Don't add any vector values - empty vector
+
+    vectorpp::InsertResponse response;
+    grpc::ClientContext context;
+
+    grpc::Status status = stub_->Insert(&context, request, &response);
+
+    ASSERT_FALSE(status.ok());
+    ASSERT_EQ(status.error_code(), grpc::StatusCode::INVALID_ARGUMENT);
+    ASSERT_TRUE(status.error_message().find("empty") != std::string::npos);
+}
+
 // Test: Search returns results
 TEST_F(GrpcServerTest, SearchReturnsResults) {
     // Insert a vector first
@@ -185,6 +200,48 @@ TEST_F(GrpcServerTest, SearchInvalidTopKFails) {
         request.add_query_vector(0.25f);
     }
     request.set_top_k(0);  // Invalid
+
+    vectorpp::SearchResponse response;
+    grpc::ClientContext context;
+
+    grpc::Status status = stub_->Search(&context, request, &response);
+
+    ASSERT_FALSE(status.ok());
+    ASSERT_EQ(status.error_code(), grpc::StatusCode::INVALID_ARGUMENT);
+}
+
+// Test: Search with empty query vector fails
+TEST_F(GrpcServerTest, SearchEmptyQueryVectorFails) {
+    vectorpp::SearchRequest request;
+    // Don't add any query vector values - empty
+    request.set_top_k(5);
+
+    vectorpp::SearchResponse response;
+    grpc::ClientContext context;
+
+    grpc::Status status = stub_->Search(&context, request, &response);
+
+    ASSERT_FALSE(status.ok());
+    ASSERT_EQ(status.error_code(), grpc::StatusCode::INVALID_ARGUMENT);
+    ASSERT_TRUE(status.error_message().find("empty") != std::string::npos);
+}
+
+// Test: Search with wrong dimension fails
+TEST_F(GrpcServerTest, SearchWrongDimensionFails) {
+    // First insert a valid vector
+    auto vec = randomVector(4);
+    vectorpp::InsertRequest insert_req;
+    for (float v : vec) insert_req.add_vector(v);
+    vectorpp::InsertResponse insert_resp;
+    grpc::ClientContext insert_ctx;
+    ASSERT_TRUE(stub_->Insert(&insert_ctx, insert_req, &insert_resp).ok());
+
+    // Search with wrong dimension (8 instead of 4)
+    vectorpp::SearchRequest request;
+    for (int i = 0; i < 8; ++i) {
+        request.add_query_vector(0.125f);
+    }
+    request.set_top_k(5);
 
     vectorpp::SearchResponse response;
     grpc::ClientContext context;

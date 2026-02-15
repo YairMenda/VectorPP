@@ -35,6 +35,12 @@ grpc::Status VectorDBServiceImpl::Insert(grpc::ServerContext* context,
         }
         logRequest("Insert", details.str());
 
+        // Validate vector is not empty
+        if (vector.empty()) {
+            logRequest("Insert", "FAILED - vector cannot be empty");
+            return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "vector cannot be empty");
+        }
+
         // Perform insert operation
         std::string id = store_->insert(vector, request->metadata());
         response->set_id(id);
@@ -69,8 +75,15 @@ grpc::Status VectorDBServiceImpl::Search(grpc::ServerContext* context,
         }
         logRequest("Search", details.str());
 
+        // Validate query vector is not empty
+        if (query.empty()) {
+            logRequest("Search", "FAILED - query_vector cannot be empty");
+            return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "query_vector cannot be empty");
+        }
+
         // Validate top_k
         if (request->top_k() <= 0) {
+            logRequest("Search", "FAILED - top_k must be positive");
             return grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "top_k must be positive");
         }
 

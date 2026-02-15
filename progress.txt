@@ -45,3 +45,27 @@ Started: 02/15/2026 11:01:18
   - Command line --port and --address can still override config file values
   - gRPC-dependent targets are now conditional in CMakeLists.txt (GRPC_ENABLED flag)
 ---
+
+## Iteration 3 - US-006: Proper gRPC error codes for all error conditions
+- What was implemented:
+  - Added empty vector validation in Insert RPC (returns INVALID_ARGUMENT)
+  - Added empty query vector validation in Search RPC (returns INVALID_ARGUMENT)
+  - Added logging for top_k validation failure in Search RPC
+  - Added 3 new integration tests: InsertEmptyVectorFails, SearchEmptyQueryVectorFails, SearchWrongDimensionFails
+- Files changed:
+  - src/server/service_impl.cpp: Added empty vector checks with proper error codes
+  - tests/integration/test_grpc_server.cpp: Added 3 new error condition tests
+- Error codes summary:
+  - Insert: INVALID_ARGUMENT (empty/wrong dim), RESOURCE_EXHAUSTED (capacity), INTERNAL (other)
+  - Search: INVALID_ARGUMENT (empty query/wrong dim/invalid top_k), INTERNAL (other)
+  - Delete: INVALID_ARGUMENT (empty id), NOT_FOUND (id missing), INTERNAL (other)
+- Tests verified:
+  - 22 config loader tests PASSED
+  - 16 thread pool tests PASSED
+  - 59 vector store tests PASSED
+  - (gRPC integration tests require gRPC to be installed)
+- Learnings for future iterations:
+  - vcpkg lock issue persists - gRPC cannot be installed yet
+  - Core tests run without gRPC; integration tests only compile when GRPC_ENABLED=TRUE
+  - All validations are done before calling store methods to fail fast
+---
