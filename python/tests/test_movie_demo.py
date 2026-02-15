@@ -18,6 +18,7 @@ from movie_demo import (
     generate_sample_movies,
     load_and_embed_movies,
     search_similar_movies,
+    interactive_mode,
 )
 
 
@@ -311,3 +312,176 @@ class TestSearchSimilarMovies:
         # Verify filter was passed
         call_args = mock_client.search.call_args
         assert call_args[1]['filter_metadata'] == "Action"
+
+
+class TestInteractiveMode:
+    """Tests for the interactive search mode."""
+
+    def test_interactive_mode_search_query(self, capsys):
+        """Test that interactive mode performs searches correctly."""
+        from vectorpp import SearchResult
+
+        mock_client = Mock()
+        mock_client.search.return_value = [
+            SearchResult(id="uuid-0", score=0.95, metadata="Action"),
+            SearchResult(id="uuid-1", score=0.85, metadata="Sci-Fi"),
+        ]
+
+        mock_embeddings = Mock()
+        mock_embeddings.embed.return_value = [0.1] * 384
+
+        id_to_movie = {
+            "uuid-0": Movie("The Matrix", "1999", "Action, Sci-Fi", "A hacker discovers reality.", "Wachowskis", "8.7"),
+            "uuid-1": Movie("Inception", "2010", "Action, Sci-Fi", "Dream within a dream.", "Christopher Nolan", "8.8"),
+        }
+
+        # Simulate user input: search query, then quit
+        with patch('builtins.input', side_effect=["space adventure", "quit"]):
+            interactive_mode(mock_client, mock_embeddings, id_to_movie)
+
+        captured = capsys.readouterr()
+        # Should show the interactive mode header
+        assert "INTERACTIVE MOVIE SEARCH" in captured.out
+        # Should show search results
+        assert "space adventure" in captured.out
+        assert "The Matrix" in captured.out
+        assert "0.95" in captured.out
+
+    def test_interactive_mode_quit_command(self, capsys):
+        """Test that quit command exits the interactive mode."""
+        mock_client = Mock()
+        mock_embeddings = Mock()
+        id_to_movie = {}
+
+        # Test various quit commands
+        for quit_cmd in ['quit', 'exit', 'q']:
+            with patch('builtins.input', side_effect=[quit_cmd]):
+                interactive_mode(mock_client, mock_embeddings, id_to_movie)
+
+            captured = capsys.readouterr()
+            assert "Goodbye!" in captured.out
+
+    def test_interactive_mode_genre_filter_command(self, capsys):
+        """Test setting genre filter in interactive mode."""
+        mock_client = Mock()
+        mock_embeddings = Mock()
+        id_to_movie = {}
+
+        with patch('builtins.input', side_effect=["genre:Action", "quit"]):
+            interactive_mode(mock_client, mock_embeddings, id_to_movie)
+
+        captured = capsys.readouterr()
+        assert "Genre filter set to: 'Action'" in captured.out
+
+    def test_interactive_mode_top_k_command(self, capsys):
+        """Test setting top-k results count in interactive mode."""
+        mock_client = Mock()
+        mock_embeddings = Mock()
+        id_to_movie = {}
+
+        with patch('builtins.input', side_effect=["top:10", "quit"]):
+            interactive_mode(mock_client, mock_embeddings, id_to_movie)
+
+        captured = capsys.readouterr()
+        assert "Results count set to: 10" in captured.out
+
+    def test_interactive_mode_invalid_top_k(self, capsys):
+        """Test handling invalid top-k value."""
+        mock_client = Mock()
+        mock_embeddings = Mock()
+        id_to_movie = {}
+
+        with patch('builtins.input', side_effect=["top:invalid", "quit"]):
+            interactive_mode(mock_client, mock_embeddings, id_to_movie)
+
+        captured = capsys.readouterr()
+        assert "Invalid number" in captured.out
+
+    def test_interactive_mode_empty_input_ignored(self, capsys):
+        """Test that empty input is ignored."""
+        mock_client = Mock()
+        mock_embeddings = Mock()
+        id_to_movie = {}
+
+        with patch('builtins.input', side_effect=["", "quit"]):
+            interactive_mode(mock_client, mock_embeddings, id_to_movie)
+
+        # Should not crash and exit cleanly
+        captured = capsys.readouterr()
+        assert "Goodbye!" in captured.out
+
+    def test_interactive_mode_keyboard_interrupt(self, capsys):
+        """Test handling keyboard interrupt (Ctrl+C)."""
+        mock_client = Mock()
+        mock_embeddings = Mock()
+        id_to_movie = {}
+
+        with patch('builtins.input', side_effect=KeyboardInterrupt()):
+            interactive_mode(mock_client, mock_embeddings, id_to_movie)
+
+        captured = capsys.readouterr()
+        assert "Goodbye!" in captured.out
+
+    def test_interactive_mode_eof(self, capsys):
+        """Test handling EOF (Ctrl+D)."""
+        mock_client = Mock()
+        mock_embeddings = Mock()
+        id_to_movie = {}
+
+        with patch('builtins.input', side_effect=EOFError()):
+            interactive_mode(mock_client, mock_embeddings, id_to_movie)
+
+        captured = capsys.readouterr()
+        assert "Goodbye!" in captured.out
+
+    def test_interactive_mode_shows_top_5_by_default(self, capsys):
+        """Test that interactive mode shows top 5 results by default."""
+        from vectorpp import SearchResult
+
+        mock_client = Mock()
+        mock_client.search.return_value = [
+            SearchResult(id=f"uuid-{i}", score=0.9 - i * 0.1, metadata="Action")
+            for i in range(5)
+        ]
+
+        mock_embeddings = Mock()
+        mock_embeddings.embed.return_value = [0.1] * 384
+
+        id_to_movie = {
+            f"uuid-{i}": Movie(f"Movie {i}", "2020", "Action", f"Overview {i}", "Director", "8.0")
+            for i in range(5)
+        }
+
+        with patch('builtins.input', side_effect=["action movies", "quit"]):
+            interactive_mode(mock_client, mock_embeddings, id_to_movie)
+
+        # Verify search was called with k=5 (default)
+        mock_client.search.assert_called_once()
+        call_args = mock_client.search.call_args
+        assert call_args[1]['k'] == 5
+
+    def test_interactive_mode_displays_timing(self, capsys):
+        """Test that interactive mode displays response time."""
+        from vectorpp import SearchResult
+
+        mock_client = Mock()
+        mock_client.search.return_value = [
+            SearchResult(id="uuid-0", score=0.95, metadata="Action"),
+        ]
+
+        mock_embeddings = Mock()
+        mock_embeddings.embed.return_value = [0.1] * 384
+
+        id_to_movie = {
+            "uuid-0": Movie("Test Movie", "2020", "Action", "Overview", "Director", "8.0"),
+        }
+
+        with patch('builtins.input', side_effect=["test", "quit"]):
+            interactive_mode(mock_client, mock_embeddings, id_to_movie)
+
+        captured = capsys.readouterr()
+        # Should display timing info (Embedding, Search, Total)
+        assert "Embedding:" in captured.out
+        assert "Search:" in captured.out
+        assert "Total:" in captured.out
+        assert "ms" in captured.out
