@@ -12,13 +12,19 @@ void VectorDBServiceImpl::logRequest(const std::string& method, const std::strin
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
         now.time_since_epoch()) % 1000;
 
-    std::cout << "[" << std::put_time(std::localtime(&time_t_now), "%Y-%m-%d %H:%M:%S")
-              << "." << std::setfill('0') << std::setw(3) << ms.count() << "] "
-              << method;
+    // Build log message first, then write atomically with lock
+    std::ostringstream log_msg;
+    log_msg << "[" << std::put_time(std::localtime(&time_t_now), "%Y-%m-%d %H:%M:%S")
+            << "." << std::setfill('0') << std::setw(3) << ms.count() << "] "
+            << method;
     if (!details.empty()) {
-        std::cout << " - " << details;
+        log_msg << " - " << details;
     }
-    std::cout << std::endl;
+    log_msg << "\n";
+
+    // Thread-safe output
+    std::lock_guard<std::mutex> lock(log_mutex_);
+    std::cout << log_msg.str() << std::flush;
 }
 
 grpc::Status VectorDBServiceImpl::Insert(grpc::ServerContext* context,

@@ -7,10 +7,12 @@
 #include <iostream>
 #include <chrono>
 #include <iomanip>
+#include <mutex>
 
 namespace vectorpp {
 
 // Implementation of the VectorDB gRPC service
+// Thread-safe: All methods can be called concurrently from multiple gRPC threads
 class VectorDBServiceImpl final : public vectorpp::VectorDB::Service {
 public:
     explicit VectorDBServiceImpl(std::shared_ptr<VectorStore> store);
@@ -32,8 +34,9 @@ public:
 
 private:
     std::shared_ptr<VectorStore> store_;
+    mutable std::mutex log_mutex_;  // Protects stdout logging from concurrent access
 
-    // Helper to log requests
+    // Helper to log requests (thread-safe)
     void logRequest(const std::string& method, const std::string& details = "");
 };
 

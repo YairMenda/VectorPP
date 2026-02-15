@@ -90,3 +90,25 @@ Started: 02/15/2026 11:01:18
   - Timestamp includes milliseconds for precise timing
   - All error paths include "FAILED - " prefix for easy log parsing
 ---
+
+## Iteration 5 - US-006: Server handles concurrent requests safely
+- What was implemented:
+  - Added thread-safe logging to VectorDBServiceImpl using mutex protection
+  - Added log_mutex_ member to VectorDBServiceImpl class
+  - Updated logRequest() to build log message in ostringstream then output atomically with lock
+  - Added documentation comments in grpc_server.cpp explaining concurrency model
+- Files changed:
+  - src/server/service_impl.hpp: Added <mutex> include, log_mutex_ member, updated class comment
+  - src/server/service_impl.cpp: Updated logRequest() to use ostringstream and mutex
+  - src/server/grpc_server.cpp: Added comments explaining gRPC concurrency model
+- Thread safety summary:
+  - VectorStore: Already thread-safe via internal mutex
+  - VectorDBServiceImpl: Now uses log_mutex_ for thread-safe stdout output
+  - gRPC Server: Uses synchronous model which spawns threads for concurrent requests
+- Tests verified:
+  - 102 tests PASSED (59 vector store, 22 config loader, 16 thread pool, 5 benchmark)
+- Learnings for future iterations:
+  - gRPC synchronous server automatically handles concurrent requests via thread spawning
+  - stdout is not thread-safe for concurrent writes - use mutex + ostringstream pattern
+  - Build log message in ostringstream first, then output atomically to prevent interleaving
+---

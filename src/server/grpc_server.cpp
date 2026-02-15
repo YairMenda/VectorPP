@@ -28,6 +28,10 @@ void GrpcServer::run() {
     builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
 
     // Register the service implementation
+    // gRPC's synchronous server automatically handles concurrent requests:
+    // - Spawns threads as needed to handle incoming RPCs
+    // - VectorStore is thread-safe via internal mutex
+    // - VectorDBServiceImpl logging is thread-safe via mutex
     builder.RegisterService(service_.get());
 
     // Build and start the server
