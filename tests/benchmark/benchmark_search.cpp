@@ -1,11 +1,15 @@
 #include <gtest/gtest.h>
 #include "core/vector_store.hpp"
+#include <nlohmann/json.hpp>
 
 #include <chrono>
 #include <iostream>
 #include <random>
 #include <vector>
 #include <iomanip>
+#include <fstream>
+#include <ctime>
+#include <sstream>
 
 using namespace vectorpp;
 
@@ -483,4 +487,262 @@ TEST_F(SearchBenchmarkTest, InsertThroughput) {
             }
         }
     }
+}
+
+// Helper to get current timestamp as ISO 8601 string
+std::string getCurrentTimestamp() {
+    auto now = std::chrono::system_clock::now();
+    auto time_t_now = std::chrono::system_clock::to_time_t(now);
+    std::tm tm_buf;
+#ifdef _WIN32
+    localtime_s(&tm_buf, &time_t_now);
+#else
+    localtime_r(&time_t_now, &tm_buf);
+#endif
+    std::ostringstream oss;
+    oss << std::put_time(&tm_buf, "%Y-%m-%dT%H:%M:%S");
+    return oss.str();
+}
+
+// Benchmark: Export results to JSON and CSV
+TEST_F(SearchBenchmarkTest, ExportResults) {
+    std::cout << "\n=== Benchmark Results Export ===" << std::endl;
+
+    // Collect all benchmark results
+    nlohmann::json results;
+    results["metadata"]["timestamp"] = getCurrentTimestamp();
+    results["metadata"]["dimensions"] = static_cast<int>(DIMENSIONS);
+
+    // Test parameters
+    std::vector<size_t> scales = {1000, 5000, 10000};
+    std::vector<size_t> thread_counts = {1, 2, 4, 8};
+    const size_t NUM_SEARCH_QUERIES = 500;
+
+    // === Insert Throughput Tests ===
+    nlohmann::json insert_results = nlohmann::json::array();
+    std::cout << "\nCollecting insert throughput data..." << std::endl;
+
+    for (size_t num_vectors : scales) {
+        VectorStoreConfig config;
+        config.dimensions = DIMENSIONS;
+        config.max_vectors = num_vectors + 1000;
+        config.thread_pool_size = 4;
+        auto test_store = std::make_unique<VectorStore>(config);
+
+        // Pre-generate vectors
+        std::vector<std::vector<float>> vectors;
+        vectors.reserve(num_vectors);
+        std::mt19937 local_rng(SEED);
+        for (size_t i = 0; i < num_vectors; ++i) {
+            vectors.push_back(generateRandomVector(DIMENSIONS, local_rng));
+        }
+
+        // Timed insert
+        auto start = std::chrono::high_resolution_clock::now();
+        for (size_t i = 0; i < num_vectors; ++i) {
+            test_store->insert(vectors[i], "category_" + std::to_string(i % 10));
+        }
+        auto end = std::chrono::high_resolution_clock::now();
+
+        auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+        double throughput = (num_vectors * 1000.0) / duration_ms;
+
+        nlohmann::json entry;
+        entry["num_vectors"] = num_vectors;
+        entry["time_ms"] = duration_ms;
+        entry["throughput_vectors_per_sec"] = throughput;
+        entry["target_vectors_per_sec"] = 50000;
+        entry["target_met"] = throughput >= 50000;
+        insert_results.push_back(entry);
+
+        std::cout << "  " << num_vectors << " vectors: " << throughput << " v/s" << std::endl;
+    }
+    results["insert_throughput"] = insert_results;
+
+    // === Search Throughput Tests ===
+    nlohmann::json search_results = nlohmann::json::array();
+    std::cout << "\nCollecting search throughput data..." << std::endl;
+
+    for (size_t num_vectors : scales) {
+        VectorStoreConfig config;
+        config.dimensions = DIMENSIONS;
+        config.max_vectors = num_vectors + 1000;
+        config.thread_pool_size = 4;
+        auto test_store = std::make_unique<VectorStore>(config);
+
+        // Insert vectors
+        std::mt19937 local_rng(SEED);
+        for (size_t i = 0; i < num_vectors; ++i) {
+            auto vec = generateRandomVector(DIMENSIONS, local_rng);
+            test_store->insert(vec, "category_" + std::to_string(i % 10));
+        }
+
+        // Generate queries
+        std::vector<std::vector<float>> search_queries;
+        search_queries.reserve(NUM_SEARCH_QUERIES);
+        for (size_t i = 0; i < NUM_SEARCH_QUERIES; ++i) {
+            search_queries.push_back(generateRandomVector(DIMENSIONS, local_rng));
+        }
+
+        // Warm-up
+        for (size_t i = 0; i < 10; ++i) {
+            test_store->search(search_queries[i], TOP_K);
+        }
+
+        // Timed search
+        auto start = std::chrono::high_resolution_clock::now();
+        auto batch_results = test_store->searchBatch(search_queries, TOP_K);
+        auto end = std::chrono::high_resolution_clock::now();
+
+        ASSERT_EQ(batch_results.size(), NUM_SEARCH_QUERIES);
+
+        auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+        double throughput = duration_ms > 0 ? (NUM_SEARCH_QUERIES * 1000.0) / duration_ms : 0;
+
+        nlohmann::json entry;
+        entry["num_vectors"] = num_vectors;
+        entry["num_queries"] = NUM_SEARCH_QUERIES;
+        entry["top_k"] = TOP_K;
+        entry["time_ms"] = duration_ms;
+        entry["throughput_queries_per_sec"] = throughput;
+        entry["target_queries_per_sec"] = 10000;
+        entry["target_met"] = throughput >= 10000;
+        search_results.push_back(entry);
+
+        std::cout << "  " << num_vectors << " vectors: " << throughput << " q/s" << std::endl;
+    }
+    results["search_throughput"] = search_results;
+
+    // === Thread Scaling Tests ===
+    nlohmann::json thread_results = nlohmann::json::array();
+    std::cout << "\nCollecting thread scaling data..." << std::endl;
+
+    const size_t THREAD_TEST_VECTORS = 5000;
+    double baseline_time = 0;
+
+    for (size_t num_threads : thread_counts) {
+        VectorStoreConfig config;
+        config.dimensions = DIMENSIONS;
+        config.max_vectors = THREAD_TEST_VECTORS + 1000;
+        config.thread_pool_size = num_threads;
+        auto test_store = std::make_unique<VectorStore>(config);
+
+        // Insert vectors
+        std::mt19937 local_rng(SEED);
+        for (size_t i = 0; i < THREAD_TEST_VECTORS; ++i) {
+            auto vec = generateRandomVector(DIMENSIONS, local_rng);
+            test_store->insert(vec, "category_" + std::to_string(i % 10));
+        }
+
+        // Generate queries
+        std::vector<std::vector<float>> search_queries;
+        search_queries.reserve(NUM_SEARCH_QUERIES);
+        for (size_t i = 0; i < NUM_SEARCH_QUERIES; ++i) {
+            search_queries.push_back(generateRandomVector(DIMENSIONS, local_rng));
+        }
+
+        // Warm-up
+        for (size_t i = 0; i < 10; ++i) {
+            test_store->search(search_queries[i], TOP_K);
+        }
+
+        // Timed search
+        auto start = std::chrono::high_resolution_clock::now();
+        auto batch_results = test_store->searchBatch(search_queries, TOP_K);
+        auto end = std::chrono::high_resolution_clock::now();
+
+        ASSERT_EQ(batch_results.size(), NUM_SEARCH_QUERIES);
+
+        auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+        double throughput = duration_ms > 0 ? (NUM_SEARCH_QUERIES * 1000.0) / duration_ms : 0;
+
+        double speedup = 1.0;
+        if (num_threads == 1) {
+            baseline_time = static_cast<double>(duration_ms);
+        } else if (baseline_time > 0 && duration_ms > 0) {
+            speedup = baseline_time / duration_ms;
+        }
+
+        nlohmann::json entry;
+        entry["num_threads"] = num_threads;
+        entry["num_vectors"] = THREAD_TEST_VECTORS;
+        entry["num_queries"] = NUM_SEARCH_QUERIES;
+        entry["time_ms"] = duration_ms;
+        entry["throughput_queries_per_sec"] = throughput;
+        entry["speedup"] = speedup;
+        thread_results.push_back(entry);
+
+        std::cout << "  " << num_threads << " threads: " << throughput << " q/s (speedup: " << speedup << "x)" << std::endl;
+    }
+    results["thread_scaling"] = thread_results;
+
+    // === Write JSON file ===
+    std::string json_filename = "benchmark_results.json";
+    std::ofstream json_file(json_filename);
+    if (json_file.is_open()) {
+        json_file << results.dump(2);
+        json_file.close();
+        std::cout << "\nJSON results exported to: " << json_filename << std::endl;
+    } else {
+        std::cerr << "Failed to write JSON file: " << json_filename << std::endl;
+    }
+
+    // === Write CSV file ===
+    std::string csv_filename = "benchmark_results.csv";
+    std::ofstream csv_file(csv_filename);
+    if (csv_file.is_open()) {
+        // Header
+        csv_file << "test_type,num_vectors,num_threads,num_queries,top_k,time_ms,throughput,speedup,target,target_met\n";
+
+        // Insert throughput
+        for (const auto& entry : insert_results) {
+            csv_file << "insert,"
+                     << entry["num_vectors"].get<int>() << ","
+                     << "4,"  // default threads
+                     << ","   // no queries
+                     << ","   // no top_k
+                     << entry["time_ms"].get<int>() << ","
+                     << std::fixed << std::setprecision(2) << entry["throughput_vectors_per_sec"].get<double>() << ","
+                     << ","   // no speedup
+                     << entry["target_vectors_per_sec"].get<int>() << ","
+                     << (entry["target_met"].get<bool>() ? "true" : "false") << "\n";
+        }
+
+        // Search throughput
+        for (const auto& entry : search_results) {
+            csv_file << "search,"
+                     << entry["num_vectors"].get<int>() << ","
+                     << "4,"  // default threads
+                     << entry["num_queries"].get<int>() << ","
+                     << entry["top_k"].get<int>() << ","
+                     << entry["time_ms"].get<int>() << ","
+                     << std::fixed << std::setprecision(2) << entry["throughput_queries_per_sec"].get<double>() << ","
+                     << ","   // no speedup
+                     << entry["target_queries_per_sec"].get<int>() << ","
+                     << (entry["target_met"].get<bool>() ? "true" : "false") << "\n";
+        }
+
+        // Thread scaling
+        for (const auto& entry : thread_results) {
+            csv_file << "thread_scaling,"
+                     << entry["num_vectors"].get<int>() << ","
+                     << entry["num_threads"].get<int>() << ","
+                     << entry["num_queries"].get<int>() << ","
+                     << TOP_K << ","
+                     << entry["time_ms"].get<int>() << ","
+                     << std::fixed << std::setprecision(2) << entry["throughput_queries_per_sec"].get<double>() << ","
+                     << std::setprecision(2) << entry["speedup"].get<double>() << ","
+                     << ","   // no target
+                     << "\n"; // no target_met
+        }
+
+        csv_file.close();
+        std::cout << "CSV results exported to: " << csv_filename << std::endl;
+    } else {
+        std::cerr << "Failed to write CSV file: " << csv_filename << std::endl;
+    }
+
+    // Record properties for test reporting
+    RecordProperty("JsonExported", 1);
+    RecordProperty("CsvExported", 1);
 }
