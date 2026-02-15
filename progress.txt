@@ -69,3 +69,24 @@ Started: 02/15/2026 11:01:18
   - Core tests run without gRPC; integration tests only compile when GRPC_ENABLED=TRUE
   - All validations are done before calling store methods to fail fast
 ---
+
+## Iteration 4 - US-006: Server logs requests to stdout/stderr
+- What was implemented:
+  - Verified that request logging was already fully implemented in previous work
+  - No new code changes required - functionality was complete
+- Existing logging implementation:
+  - service_impl.cpp has logRequest() method with timestamp format [YYYY-MM-DD HH:MM:SS.mmm]
+  - Insert logs: vector_dim, metadata, and failures
+  - Search logs: vector_dim, top_k, filter, and failures
+  - Delete logs: id and failures
+  - grpc_server.cpp logs server startup with all config parameters
+  - Shutdown logging also implemented
+- Tests verified:
+  - 22 config loader tests PASSED
+  - 16 thread pool tests PASSED
+  - 59 vector store tests PASSED
+- Learnings for future iterations:
+  - Request logging uses std::cout for all output (stdout)
+  - Timestamp includes milliseconds for precise timing
+  - All error paths include "FAILED - " prefix for easy log parsing
+---
