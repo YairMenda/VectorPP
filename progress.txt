@@ -89,3 +89,21 @@ Started: 02/15/2026 22:37:17
   - Search throughput scales inversely with dataset size (more vectors = slower)
   - Performance is currently below target - may need HNSW parameter tuning
 ---
+
+## Iteration 6 - Tests at Various Scales (US-009)
+- What was implemented: Verified that scale testing (1K, 5K, 10K vectors) was already implemented in existing benchmarks
+- Files changed:
+  - PRD.md - Marked task as complete
+- Implementation details:
+  - Both InsertThroughput and SearchThroughput tests already iterate through {1000, 5000, 10000} vector scales
+  - Each scale creates a fresh VectorStore to ensure clean measurements
+  - Results are displayed in a formatted table showing vectors, time, and throughput
+  - Tests pass successfully with output showing performance at each scale
+- Test results (run on 2/15/2026):
+  - Insert: 1K (4,545 v/s), 5K (1,505 v/s), 10K (883 v/s)
+  - Search: 1K (6,329 q/s), 5K (3,185 q/s), 10K (2,525 q/s)
+- Learnings for future iterations:
+  - Scale testing is already built into the throughput benchmarks
+  - Performance decreases with scale due to HNSW index complexity
+  - The existing benchmark architecture supports easy addition of more scales if needed
+---
