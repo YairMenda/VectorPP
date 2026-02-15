@@ -172,7 +172,7 @@ Vector++ is a high-performance, in-memory vector database implemented in C++17. 
 - [x] Tests with different thread counts: 1, 2, 4, 8 threads
 - [x] Results exported to JSON/CSV for visualization
 - [x] Includes vector dimension variations (384, 768, 1536)
-- [ ] Documents hardware specs used for benchmarks
+- [x] Documents hardware specs used for benchmarks
 
 - **Priority:** 2
 - **Status:** false

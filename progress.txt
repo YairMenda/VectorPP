@@ -174,3 +174,30 @@ Started: 02/15/2026 22:37:17
   - Higher dimensions require more memory and computation per distance calculation
   - The test takes ~51 seconds due to building 6 separate indexes (3 dims x 2 test types)
 ---
+
+## Iteration 10 - Document Hardware Specs for Benchmarks (US-009)
+- What was implemented: Added comprehensive hardware specification documentation to benchmarks
+- Files changed:
+  - tests/benchmark/benchmark_search.cpp - Added hardware spec collection functions and DocumentHardwareSpecs test
+  - PRD.md - Marked task as complete
+- Implementation details:
+  - Added HardwareSpecs struct to hold system info (OS, CPU, memory, compiler, build type)
+  - Cross-platform functions: getCpuBrandString(), getOsInfo(), getPhysicalCores(), getTotalMemoryMB()
+  - Windows: Uses __cpuid for CPU brand, GetVersionEx for OS, GetLogicalProcessorInformationEx for cores, GlobalMemoryStatusEx for RAM
+  - Linux: Parses /proc/cpuinfo for CPU, uname for OS, /proc/meminfo for RAM
+  - New test DocumentHardwareSpecs: displays and exports all hardware info
+  - Exports to hardware_specs.json with timestamp
+  - ExportResults test now includes hardware specs in benchmark_results.json metadata
+  - Console output shows: OS, Architecture, CPU model, Physical/Logical cores, Total RAM, Compiler, Build type
+- Hardware detected on test system:
+  - OS: Windows 6.2 (Build 9200)
+  - CPU: Intel(R) Core(TM) i7-10510U CPU @ 1.80GHz (4 physical, 8 logical cores)
+  - RAM: 16190 MB (15.8 GB)
+  - Compiler: MSVC 1936, Release build
+- Learnings for future iterations:
+  - Run with --gtest_filter=SearchBenchmarkTest.DocumentHardwareSpecs for quick hardware info
+  - Hardware specs are automatically included in benchmark_results.json metadata section
+  - Windows version detection shows 6.2 due to compatibility mode (GetVersionEx limitation)
+  - Cross-platform code uses #ifdef _WIN32 / __linux__ for platform-specific implementations
+  - All 11 benchmark tests pass (~3 minutes total)
+---

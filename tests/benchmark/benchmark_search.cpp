@@ -10,8 +10,255 @@
 #include <fstream>
 #include <ctime>
 #include <sstream>
+#include <thread>
+#include <set>
+#include <cstring>
+
+#ifdef _WIN32
+#include <windows.h>
+#include <intrin.h>
+#elif defined(__linux__)
+#include <sys/utsname.h>
+#include <unistd.h>
+#endif
 
 using namespace vectorpp;
+
+// Hardware spec collection structures and functions
+struct HardwareSpecs {
+    std::string os_name;
+    std::string os_version;
+    std::string cpu_name;
+    int cpu_cores_logical;
+    int cpu_cores_physical;
+    uint64_t total_memory_mb;
+    std::string architecture;
+    std::string compiler;
+    std::string compiler_version;
+    std::string build_type;
+};
+
+// Get CPU name/brand string
+std::string getCpuBrandString() {
+#ifdef _WIN32
+    int cpu_info[4] = {0};
+    char brand[49] = {0};
+
+    __cpuid(cpu_info, 0x80000000);
+    int max_id = cpu_info[0];
+
+    if (max_id >= 0x80000004) {
+        __cpuid(cpu_info, 0x80000002);
+        memcpy(brand, cpu_info, sizeof(cpu_info));
+        __cpuid(cpu_info, 0x80000003);
+        memcpy(brand + 16, cpu_info, sizeof(cpu_info));
+        __cpuid(cpu_info, 0x80000004);
+        memcpy(brand + 32, cpu_info, sizeof(cpu_info));
+
+        // Trim leading spaces
+        std::string result(brand);
+        size_t start = result.find_first_not_of(' ');
+        if (start != std::string::npos) {
+            result = result.substr(start);
+        }
+        return result;
+    }
+    return "Unknown CPU";
+#elif defined(__linux__)
+    std::ifstream cpuinfo("/proc/cpuinfo");
+    std::string line;
+    while (std::getline(cpuinfo, line)) {
+        if (line.find("model name") != std::string::npos) {
+            size_t colon = line.find(':');
+            if (colon != std::string::npos && colon + 2 < line.size()) {
+                return line.substr(colon + 2);
+            }
+        }
+    }
+    return "Unknown CPU";
+#else
+    return "Unknown CPU";
+#endif
+}
+
+// Get OS information
+std::pair<std::string, std::string> getOsInfo() {
+#ifdef _WIN32
+    OSVERSIONINFOEX osvi;
+    ZeroMemory(&osvi, sizeof(OSVERSIONINFOEX));
+    osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEX);
+
+    // Note: GetVersionEx is deprecated but works for our purposes
+    #pragma warning(disable: 4996)
+    if (GetVersionEx((OSVERSIONINFO*)&osvi)) {
+        std::ostringstream version;
+        version << osvi.dwMajorVersion << "." << osvi.dwMinorVersion
+                << " (Build " << osvi.dwBuildNumber << ")";
+        return {"Windows", version.str()};
+    }
+    #pragma warning(default: 4996)
+    return {"Windows", "Unknown version"};
+#elif defined(__linux__)
+    struct utsname buf;
+    if (uname(&buf) == 0) {
+        return {buf.sysname, std::string(buf.release) + " " + buf.version};
+    }
+    return {"Linux", "Unknown version"};
+#elif defined(__APPLE__)
+    return {"macOS", "Unknown version"};
+#else
+    return {"Unknown OS", "Unknown version"};
+#endif
+}
+
+// Get physical CPU core count
+int getPhysicalCores() {
+#ifdef _WIN32
+    DWORD length = 0;
+    GetLogicalProcessorInformationEx(RelationProcessorCore, nullptr, &length);
+
+    if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
+        std::vector<char> buffer(length);
+        auto info = reinterpret_cast<PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX>(buffer.data());
+
+        if (GetLogicalProcessorInformationEx(RelationProcessorCore, info, &length)) {
+            int count = 0;
+            char* ptr = buffer.data();
+            while (ptr < buffer.data() + length) {
+                auto current = reinterpret_cast<PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX>(ptr);
+                if (current->Relationship == RelationProcessorCore) {
+                    count++;
+                }
+                ptr += current->Size;
+            }
+            return count;
+        }
+    }
+    // Fallback: assume hyperthreading with 2 threads per core
+    return static_cast<int>(std::thread::hardware_concurrency()) / 2;
+#elif defined(__linux__)
+    std::ifstream cpuinfo("/proc/cpuinfo");
+    std::string line;
+    std::set<std::pair<int, int>> cores; // physical_id, core_id pairs
+    int physical_id = 0, core_id = 0;
+
+    while (std::getline(cpuinfo, line)) {
+        if (line.find("physical id") != std::string::npos) {
+            size_t colon = line.find(':');
+            if (colon != std::string::npos) {
+                physical_id = std::stoi(line.substr(colon + 1));
+            }
+        } else if (line.find("core id") != std::string::npos) {
+            size_t colon = line.find(':');
+            if (colon != std::string::npos) {
+                core_id = std::stoi(line.substr(colon + 1));
+                cores.insert({physical_id, core_id});
+            }
+        }
+    }
+
+    if (!cores.empty()) {
+        return static_cast<int>(cores.size());
+    }
+    // Fallback
+    return static_cast<int>(std::thread::hardware_concurrency()) / 2;
+#else
+    return static_cast<int>(std::thread::hardware_concurrency()) / 2;
+#endif
+}
+
+// Get total system memory in MB
+uint64_t getTotalMemoryMB() {
+#ifdef _WIN32
+    MEMORYSTATUSEX memInfo;
+    memInfo.dwLength = sizeof(MEMORYSTATUSEX);
+    if (GlobalMemoryStatusEx(&memInfo)) {
+        return memInfo.ullTotalPhys / (1024 * 1024);
+    }
+    return 0;
+#elif defined(__linux__)
+    std::ifstream meminfo("/proc/meminfo");
+    std::string line;
+    while (std::getline(meminfo, line)) {
+        if (line.find("MemTotal:") != std::string::npos) {
+            uint64_t kb;
+            sscanf(line.c_str(), "MemTotal: %lu kB", &kb);
+            return kb / 1024;
+        }
+    }
+    return 0;
+#else
+    return 0;
+#endif
+}
+
+// Collect all hardware specs
+HardwareSpecs collectHardwareSpecs() {
+    HardwareSpecs specs;
+
+    auto [os_name, os_version] = getOsInfo();
+    specs.os_name = os_name;
+    specs.os_version = os_version;
+
+    specs.cpu_name = getCpuBrandString();
+    specs.cpu_cores_logical = static_cast<int>(std::thread::hardware_concurrency());
+    specs.cpu_cores_physical = getPhysicalCores();
+    specs.total_memory_mb = getTotalMemoryMB();
+
+#ifdef _WIN64
+    specs.architecture = "x86_64";
+#elif defined(_WIN32)
+    specs.architecture = "x86";
+#elif defined(__x86_64__)
+    specs.architecture = "x86_64";
+#elif defined(__aarch64__)
+    specs.architecture = "ARM64";
+#else
+    specs.architecture = "Unknown";
+#endif
+
+#ifdef _MSC_VER
+    specs.compiler = "MSVC";
+    specs.compiler_version = std::to_string(_MSC_VER);
+#elif defined(__clang__)
+    specs.compiler = "Clang";
+    specs.compiler_version = std::to_string(__clang_major__) + "." +
+                             std::to_string(__clang_minor__) + "." +
+                             std::to_string(__clang_patchlevel__);
+#elif defined(__GNUC__)
+    specs.compiler = "GCC";
+    specs.compiler_version = std::to_string(__GNUC__) + "." +
+                             std::to_string(__GNUC_MINOR__) + "." +
+                             std::to_string(__GNUC_PATCHLEVEL__);
+#else
+    specs.compiler = "Unknown";
+    specs.compiler_version = "Unknown";
+#endif
+
+#ifdef NDEBUG
+    specs.build_type = "Release";
+#else
+    specs.build_type = "Debug";
+#endif
+
+    return specs;
+}
+
+// Convert hardware specs to JSON
+nlohmann::json hardwareSpecsToJson(const HardwareSpecs& specs) {
+    nlohmann::json j;
+    j["os"]["name"] = specs.os_name;
+    j["os"]["version"] = specs.os_version;
+    j["cpu"]["name"] = specs.cpu_name;
+    j["cpu"]["cores_logical"] = specs.cpu_cores_logical;
+    j["cpu"]["cores_physical"] = specs.cpu_cores_physical;
+    j["memory"]["total_mb"] = specs.total_memory_mb;
+    j["architecture"] = specs.architecture;
+    j["compiler"]["name"] = specs.compiler;
+    j["compiler"]["version"] = specs.compiler_version;
+    j["build_type"] = specs.build_type;
+    return j;
+}
 
 // Helper to generate random vectors
 std::vector<float> generateRandomVector(size_t dim, std::mt19937& rng) {
@@ -513,6 +760,10 @@ TEST_F(SearchBenchmarkTest, ExportResults) {
     results["metadata"]["timestamp"] = getCurrentTimestamp();
     results["metadata"]["dimensions"] = static_cast<int>(DIMENSIONS);
 
+    // Add hardware specs to metadata
+    HardwareSpecs specs = collectHardwareSpecs();
+    results["metadata"]["hardware"] = hardwareSpecsToJson(specs);
+
     // Test parameters
     std::vector<size_t> scales = {1000, 5000, 10000};
     std::vector<size_t> thread_counts = {1, 2, 4, 8};
@@ -862,4 +1113,63 @@ TEST_F(SearchBenchmarkTest, DimensionVariations) {
     std::cout << "  - 768 dims: BERT base" << std::endl;
     std::cout << "  - 1536 dims: OpenAI ada-002" << std::endl;
     std::cout << "  - Dataset: " << TEST_VECTORS << " vectors, " << NUM_SEARCH_QUERIES << " queries" << std::endl;
+}
+
+// Test: Document hardware specifications
+TEST_F(SearchBenchmarkTest, DocumentHardwareSpecs) {
+    std::cout << "\n=== Hardware Specifications ===" << std::endl;
+
+    HardwareSpecs specs = collectHardwareSpecs();
+
+    // Display hardware specs in console
+    std::cout << "\nSystem Information:" << std::endl;
+    std::cout << "  OS:           " << specs.os_name << " " << specs.os_version << std::endl;
+    std::cout << "  Architecture: " << specs.architecture << std::endl;
+    std::cout << std::endl;
+
+    std::cout << "CPU Information:" << std::endl;
+    std::cout << "  Model:        " << specs.cpu_name << std::endl;
+    std::cout << "  Physical cores: " << specs.cpu_cores_physical << std::endl;
+    std::cout << "  Logical cores:  " << specs.cpu_cores_logical << std::endl;
+    std::cout << std::endl;
+
+    std::cout << "Memory Information:" << std::endl;
+    std::cout << "  Total RAM:    " << specs.total_memory_mb << " MB ("
+              << std::fixed << std::setprecision(1)
+              << (specs.total_memory_mb / 1024.0) << " GB)" << std::endl;
+    std::cout << std::endl;
+
+    std::cout << "Build Information:" << std::endl;
+    std::cout << "  Compiler:     " << specs.compiler << " " << specs.compiler_version << std::endl;
+    std::cout << "  Build type:   " << specs.build_type << std::endl;
+    std::cout << std::endl;
+
+    // Export hardware specs to JSON file
+    nlohmann::json hw_json = hardwareSpecsToJson(specs);
+    hw_json["timestamp"] = getCurrentTimestamp();
+
+    std::string hw_filename = "hardware_specs.json";
+    std::ofstream hw_file(hw_filename);
+    if (hw_file.is_open()) {
+        hw_file << hw_json.dump(2);
+        hw_file.close();
+        std::cout << "Hardware specs exported to: " << hw_filename << std::endl;
+    } else {
+        std::cerr << "Failed to write hardware specs file: " << hw_filename << std::endl;
+    }
+
+    // Record properties for test reporting
+    RecordProperty("CPU", specs.cpu_name);
+    RecordProperty("CPUCoresPhysical", specs.cpu_cores_physical);
+    RecordProperty("CPUCoresLogical", specs.cpu_cores_logical);
+    RecordProperty("MemoryMB", static_cast<int>(specs.total_memory_mb));
+    RecordProperty("OS", specs.os_name);
+    RecordProperty("Compiler", specs.compiler);
+    RecordProperty("BuildType", specs.build_type);
+
+    // Verify specs were collected (basic sanity checks)
+    ASSERT_GT(specs.cpu_cores_logical, 0);
+    ASSERT_GT(specs.total_memory_mb, 0);
+    ASSERT_FALSE(specs.os_name.empty());
+    ASSERT_FALSE(specs.cpu_name.empty());
 }
