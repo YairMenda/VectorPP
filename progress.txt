@@ -16,4 +16,5 @@ Started: 02/16/2026 12:11:22
   - Default config at config/default.json
   - Server logs all config on startup (grpc_server.cpp lines 47-62)
   - Command-line args can override config file values (--config, --port, --address, --dims, --max-vectors)
+- Also updated all user story status fields from false to true
 ---
