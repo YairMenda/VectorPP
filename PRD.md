@@ -184,15 +184,15 @@ Vector++ is a high-performance, in-memory vector database implemented in C++17. 
 **Description:** As an operator, I want to configure the server via a config file so that I can customize behavior without recompiling.
 
 **Acceptance Criteria:**
-- [ ] YAML or JSON config file support
-- [ ] Configurable: server port, thread count, max vectors, vector dimensions
-- [ ] Configurable: HNSW parameters (M, ef_construction, ef_search)
-- [ ] Default config file included in repository
-- [ ] Server logs loaded configuration on startup
-- [ ] Unit tests for config parsing
+- [x] YAML or JSON config file support
+- [x] Configurable: server port, thread count, max vectors, vector dimensions
+- [x] Configurable: HNSW parameters (M, ef_construction, ef_search)
+- [x] Default config file included in repository
+- [x] Server logs loaded configuration on startup
+- [x] Unit tests for config parsing
 
 - **Priority:** 3
-- **Status:** false
+- **Status:** true
 - **Notes:** Operational convenience
 
 ---
